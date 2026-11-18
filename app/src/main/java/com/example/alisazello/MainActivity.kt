@@ -60,13 +60,13 @@ private object SecureCredentialStore {
     }
     fun save(context: android.content.Context, username: String, password: String) {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding"); cipher.init(Cipher.ENCRYPT_MODE, key())
-        val bytes = cipher.doFinal((username + String(charArrayOf(10)) + password).toByteArray(StandardCharsets.UTF_8))
+        val bytes = cipher.doFinal((username + "\\n" + password).toByteArray(StandardCharsets.UTF_8))
         context.getSharedPreferences(PREFS, 0).edit().putString("iv", Base64.encodeToString(cipher.iv, Base64.NO_WRAP)).putString("data", Base64.encodeToString(bytes, Base64.NO_WRAP)).apply()
     }
     fun read(context: android.content.Context): Pair<String, String>? = runCatching {
         val p = context.getSharedPreferences(PREFS, 0); val iv = p.getString("iv", null) ?: return null; val data = p.getString("data", null) ?: return null
         val cipher = Cipher.getInstance("AES/GCM/NoPadding"); cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, Base64.decode(iv, Base64.NO_WRAP)))
-        val decoded = String(cipher.doFinal(Base64.decode(data, Base64.NO_WRAP)), StandardCharsets.UTF_8); val i = decoded.indexOf(10)
+        val decoded = String(cipher.doFinal(Base64.decode(data, Base64.NO_WRAP)), StandardCharsets.UTF_8); val i = decoded.indexOf('\\n')
         if (i <= 0) null else Pair(decoded.substring(0, i), decoded.substring(i + 1))
     }.getOrNull()
     fun clear(context: android.content.Context) { context.getSharedPreferences(PREFS, 0).edit().clear().apply() }
