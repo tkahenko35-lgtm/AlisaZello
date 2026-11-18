@@ -3,7 +3,6 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
-
 android {
     namespace = "com.example.alisazello"
     compileSdk = 36
@@ -11,19 +10,16 @@ android {
         applicationId = "com.example.alisazello"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1"
+        versionCode = 2
+        versionName = "0.2"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
     }
-    kotlinOptions {
-        jvmTarget = "21"
-    }
+    kotlinOptions { jvmTarget = "21" }
     buildFeatures { compose = true }
 }
-
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2025.10.00"))
     implementation("androidx.activity:activity-compose:1.11.0")
@@ -31,5 +27,6 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("com.zello:zello-channel-sdk:0.5.2")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
