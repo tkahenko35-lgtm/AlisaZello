@@ -1,6 +1,8 @@
 package com.example.alisazello
 
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
@@ -136,6 +138,9 @@ private fun AlisaApp() {
     var connectionStatus by remember { mutableStateOf("Не подключено") }
     var connectedChannel by remember { mutableStateOf<String?>(null) }
     var zelloSession by remember { mutableStateOf<Session?>(null) }
+    val reconnectHandler = remember { Handler(Looper.getMainLooper()) }
+    var reconnectRunnable by remember { mutableStateOf<Runnable?>(null) }
+    var reconnectAttempt by remember { mutableIntStateOf(0) }
 
     val channels = remember(context) {
         mutableStateListOf<String>().apply {
@@ -148,13 +153,20 @@ private fun AlisaApp() {
     }
 
     DisposableEffect(Unit) {
-        onDispose { zelloSession?.disconnect() }
+        onDispose {
+            reconnectRunnable?.let(reconnectHandler::removeCallbacks)
+            reconnectRunnable = null
+            zelloSession?.disconnect()
+        }
     }
 
     fun disconnectZello() {
+        reconnectRunnable?.let(reconnectHandler::removeCallbacks)
+        reconnectRunnable = null
         zelloSession?.disconnect()
         zelloSession = null
         connectedChannel = null
+        reconnectAttempt = 0
         connectionStatus = "Не подключено"
     }
 
@@ -187,13 +199,29 @@ private fun AlisaApp() {
                 zelloSession = null
             }
             override fun onConnectSucceeded(session: Session) {
-                connectionStatus = "Подключено к «$channel» — режим прослушивания"
+                if (zelloSession !== session) return
+                reconnectRunnable?.let(reconnectHandler::removeCallbacks)
+                reconnectRunnable = null
+                reconnectAttempt = 0
+                connectionStatus = "Подключено к «$channel»"
                 connectedChannel = channel
             }
             override fun onDisconnected(session: Session) {
-                connectionStatus = "Соединение с Zello закрыто"
+                if (zelloSession !== session) return
                 connectedChannel = null
                 zelloSession = null
+                val delayMs = minOf(5_000L * (1L shl reconnectAttempt.coerceAtMost(4)), 60_000L)
+                reconnectAttempt += 1
+                connectionStatus = "Связь потеряна. Повторное подключение через ${delayMs / 1000} сек…"
+                val retry = Runnable {
+                    reconnectRunnable = null
+                    if (zelloSession == null && connectedChannel == null && tokenSaved) {
+                        connectZello(channel)
+                    }
+                }
+                reconnectRunnable?.let(reconnectHandler::removeCallbacks)
+                reconnectRunnable = retry
+                reconnectHandler.postDelayed(retry, delayMs)
             }
             override fun onSessionWillReconnect(session: Session, reason: ReconnectReason): Boolean {
                 connectionStatus = "Связь потеряна. Zello переподключается…"
