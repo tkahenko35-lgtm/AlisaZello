@@ -3,6 +3,7 @@ package com.example.alisazello
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import com.zello.channel.sdk.IncomingVoiceConfiguration
 import com.zello.channel.sdk.IncomingVoiceStream
 import com.zello.channel.sdk.OutgoingVoiceConfiguration
@@ -58,6 +59,7 @@ internal object YandexVoiceAssistant {
                 if (bytes.isEmpty()) return
                 val samples = ShortArray(bytes.size / 2)
                 ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(samples)
+                Log.d("AlisaRadio", "Incoming voice stopped: sender=$senderName samples=${samples.size} rate=$rate")
                 onAudio(senderName, samples, rate)
             }
         }
@@ -74,10 +76,13 @@ internal object YandexVoiceAssistant {
         onReply: (String, ShortArray?) -> Unit
     ) {
         requestWorker.execute {
+            Log.d("AlisaRadio", "Processing request from $sender, samples=${pcm.size}, rate=$sampleRate")
             try {
                 val normalized = resample(pcm, sampleRate, TARGET_RATE)
                 val recognized = recognize(apiKey, folderId, normalized)
-                if (recognized.isBlank() || !recognized.contains(Regex("алис[аы]", RegexOption.IGNORE_CASE))) return@execute
+                val hasWakeWord = recognized.contains(Regex("алис[аы]", RegexOption.IGNORE_CASE))
+                Log.d("AlisaRadio", "Speech recognized: chars=${recognized.length}, wakeWord=$hasWakeWord")
+                if (recognized.isBlank() || !hasWakeWord) return@execute
                 val question = recognized.replace(Regex("(?i)алис[аы][,!. ]*"), "").trim()
                 if (question.isBlank()) {
                     val phrase = "Я здесь. Говори, не стесняйся."
@@ -89,8 +94,11 @@ internal object YandexVoiceAssistant {
                 } else {
                     ask(apiKey, folderId, sender, question)
                 }
-                onReply(answer, synthesize(apiKey, folderId, answer))
+                val replyAudio = synthesize(apiKey, folderId, answer)
+                Log.d("AlisaRadio", "Reply synthesized: chars=${answer.length}, samples=${replyAudio.size}")
+                onReply(answer, replyAudio)
             } catch (e: Exception) {
+                Log.e("AlisaRadio", "Request processing failed", e)
                 val message = "Не смогла обработать запрос: ${safeError(e)}"
                 val fallbackAudio = runCatching { synthesize(apiKey, folderId, message) }.getOrNull()
                 onReply(message, fallbackAudio)
