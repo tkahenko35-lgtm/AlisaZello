@@ -35,7 +35,8 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.13'
-      - name: Build debug APK (diagnostic only)
+
+      - name: Build debug APK (diagnostics)
         run: gradle --no-daemon assembleDebug
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
@@ -43,20 +44,54 @@ jobs:
           name: AlisaRadio-debug-apk
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
+      # If repository signing secrets are not configured yet, create a one-time
+      # release key for this first install. Keep the backup artifact private.
+      - name: Generate first-install signing key
+        if: ${{ env.KEYSTORE_BASE64 == '' || env.KEYSTORE_PASSWORD == '' || env.KEY_ALIAS == '' || env.KEY_PASSWORD == '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          STORE="$RUNNER_TEMP/alisaradio-release.jks"
+          STORE_PASS="$(openssl rand -hex 24)"
+          ALIAS="alisaradio"
+          keytool -genkeypair -noprompt -v -keystore "$STORE" -storetype JKS \
+            -storepass "$STORE_PASS" -keypass "$STORE_PASS" -alias "$ALIAS" \
+            -dname "CN=Alisa Radio, OU=Android, O=Alisa Radio, C=DE" \
+            -keyalg RSA -keysize 2048 -validity 10000
+          echo "KEYSTORE_FILE=$STORE" >> "$GITHUB_ENV"
+          echo "KEYSTORE_PASSWORD=$STORE_PASS" >> "$GITHUB_ENV"
+          echo "KEY_ALIAS=$ALIAS" >> "$GITHUB_ENV"
+          echo "KEY_PASSWORD=$STORE_PASS" >> "$GITHUB_ENV"
+          mkdir -p signing-backup
+          cp "$STORE" signing-backup/alisaradio-release.jks
+          {
+            echo "KEYSTORE_PASSWORD=$STORE_PASS"
+            echo "KEY_ALIAS=$ALIAS"
+            echo "KEY_PASSWORD=$STORE_PASS"
+          } > signing-backup/SIGNING-INFO.txt
+
       - name: Restore permanent signing key
-        if: ${{ env.KEYSTORE_BASE64 != '' }}
+        if: ${{ env.KEYSTORE_BASE64 != '' && env.KEYSTORE_PASSWORD != '' && env.KEY_ALIAS != '' && env.KEY_PASSWORD != '' }}
+        shell: bash
         run: |
           echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/alisaradio-release.jks"
           echo "KEYSTORE_FILE=$RUNNER_TEMP/alisaradio-release.jks" >> "$GITHUB_ENV"
-      - name: Build permanently signed release APK
-        if: ${{ env.KEYSTORE_BASE64 != '' && env.KEYSTORE_PASSWORD != '' && env.KEY_ALIAS != '' && env.KEY_PASSWORD != '' }}
+
+      - name: Build signed release APK
         env:
           KEYSTORE_FILE: ${{ env.KEYSTORE_FILE }}
         run: gradle --no-daemon assembleRelease
-      - name: Upload permanently signed APK
-        if: ${{ env.KEYSTORE_BASE64 != '' && env.KEYSTORE_PASSWORD != '' && env.KEY_ALIAS != '' && env.KEY_PASSWORD != '' }}
+      - name: Upload signed release APK
         uses: actions/upload-artifact@v4
         with:
-          name: AlisaRadio-signed-apk
+          name: AlisaRadio-release-apk
           path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+      - name: Upload signing key backup (keep private)
+        if: ${{ hashFiles('signing-backup/alisaradio-release.jks') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: AlisaRadio-signing-key-backup
+          path: signing-backup/*
           if-no-files-found: error
