@@ -74,6 +74,43 @@ private object SecureCredentialStore {
     fun clear(context: android.content.Context) { context.getSharedPreferences(PREFS, 0).edit().clear().apply() }
 }
 
+/** Stores Yandex AI Studio credentials encrypted with Android Keystore. */
+private object YandexCredentialStore {
+    private const val PREFS = "alisa_yandex_secure"
+    private const val KEY_ALIAS = "alisa_yandex_credentials_key"
+    private fun key(): SecretKey {
+        val ks = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        (ks.getKey(KEY_ALIAS, null) as? SecretKey)?.let { return it }
+        val gen = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
+        gen.init(KeyGenParameterSpec.Builder(KEY_ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+            .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+            .setRandomizedEncryptionRequired(true).build())
+        return gen.generateKey()
+    }
+    fun save(context: android.content.Context, apiKey: String, folderId: String) {
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, key())
+        val data = cipher.doFinal((apiKey.trim() + "\n" + folderId.trim()).toByteArray(StandardCharsets.UTF_8))
+        context.getSharedPreferences(PREFS, 0).edit()
+            .putString("iv", Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
+            .putString("data", Base64.encodeToString(data, Base64.NO_WRAP)).apply()
+    }
+    fun read(context: android.content.Context): Pair<String, String>? = runCatching {
+        val p = context.getSharedPreferences(PREFS, 0)
+        val iv = Base64.decode(p.getString("iv", null) ?: return null, Base64.NO_WRAP)
+        val data = Base64.decode(p.getString("data", null) ?: return null, Base64.NO_WRAP)
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, iv))
+        val value = String(cipher.doFinal(data), StandardCharsets.UTF_8)
+        val split = value.indexOf('\n')
+        if (split <= 0) null else Pair(value.substring(0, split), value.substring(split + 1))
+    }.getOrNull()
+    fun clear(context: android.content.Context) {
+        context.getSharedPreferences(PREFS, 0).edit().clear().apply()
+    }
+}
+
 private object SecureTokenStore {
     private const val PREFS = "alisa_secure"
     private const val KEY_ALIAS = "alisa_zello_token_key"
@@ -135,6 +172,9 @@ private fun AlisaApp() {
     var zelloUsername by remember { mutableStateOf(SecureCredentialStore.read(context)?.first.orEmpty()) }
     var zelloPassword by remember { mutableStateOf(SecureCredentialStore.read(context)?.second.orEmpty()) }
     var credentialsSaved by remember { mutableStateOf(SecureCredentialStore.read(context) != null) }
+    var yandexApiKey by remember { mutableStateOf(YandexCredentialStore.read(context)?.first.orEmpty()) }
+    var yandexFolderId by remember { mutableStateOf(YandexCredentialStore.read(context)?.second.orEmpty()) }
+    var yandexSaved by remember { mutableStateOf(YandexCredentialStore.read(context) != null) }
     var connectionStatus by remember { mutableStateOf("Не подключено") }
     var connectedChannel by remember { mutableStateOf<String?>(null) }
     var zelloSession by remember { mutableStateOf<Session?>(null) }
@@ -340,6 +380,34 @@ private fun AlisaApp() {
                                 OutlinedButton(onClick = { SecureCredentialStore.clear(context); zelloUsername = ""; zelloPassword = ""; credentialsSaved = false; if (connectedChannel != null) disconnectZello() }) { Text("Очистить") }
                             }
                             Text("Логин и пароль шифруются на телефоне. Не присылай их в чат. После сохранения переподключи канал.", color = Color.LightGray, fontSize = 11.sp)
+                        }
+                    }
+                }
+                item {
+                    Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
+                        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text("Yandex AI Studio", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                            Text(if (yandexSaved) "Данные Яндекса сохранены на телефоне." else "API-ключ и ID каталога для распознавания речи, ответов YandexGPT и озвучивания Алисы.", color = Color.LightGray, fontSize = 12.sp)
+                            OutlinedTextField(value = yandexApiKey, onValueChange = { yandexApiKey = it; yandexSaved = false }, modifier = Modifier.fillMaxWidth(), label = { Text("API-ключ Yandex AI Studio") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
+                            OutlinedTextField(value = yandexFolderId, onValueChange = { yandexFolderId = it; yandexSaved = false }, modifier = Modifier.fillMaxWidth(), label = { Text("ID каталога Yandex Cloud") }, singleLine = true)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(onClick = {
+                                    val key = yandexApiKey.trim()
+                                    val folder = yandexFolderId.trim()
+                                    if (key.isNotEmpty() && folder.isNotEmpty()) {
+                                        runCatching { YandexCredentialStore.save(context, key, folder) }
+                                            .onSuccess { yandexSaved = true }
+                                            .onFailure { yandexSaved = false }
+                                    }
+                                }, modifier = Modifier.weight(1f), enabled = yandexApiKey.isNotBlank() && yandexFolderId.isNotBlank()) { Text("Сохранить Яндекс") }
+                                OutlinedButton(onClick = {
+                                    YandexCredentialStore.clear(context)
+                                    yandexApiKey = ""
+                                    yandexFolderId = ""
+                                    yandexSaved = false
+                                }) { Text("Очистить") }
+                            }
+                            Text("Ключ вводится только в приложение, не присылай его в чат. Сохранение защищено Android Keystore. Интеграция сервисов Яндекса будет следующим этапом.", color = Color.LightGray, fontSize = 11.sp)
                         }
                     }
                 }
