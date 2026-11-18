@@ -210,7 +210,7 @@ internal object YandexVoiceAssistant {
     }
 
     private fun isMusicCommand(text: String): Boolean =
-        Regex("(?i)\\b(включи|поставь|играй|следующ|пауза|громче|тише|выключи музыку)\\b").containsMatchIn(text)
+        Regex("(?i)(включи|поставь|запусти|сыграй|воспроизведи|найди и включи|следующ|предыдущ|дальше|назад|пауза|останови|стоп музыка|выключи музыку|продолжи|возобнови|играй дальше|громче|тише)").containsMatchIn(text)
 
     private fun enc(value: String): String = URLEncoder.encode(value, "UTF-8")
 
