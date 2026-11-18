@@ -1,6 +1,9 @@
 package com.example.alisazello
 
 import android.os.Bundle
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyProperties
+import android.util.Base64
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -9,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Mic
@@ -20,8 +24,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.nio.charset.StandardCharsets
+import java.security.KeyStore
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
+import javax.crypto.spec.GCMParameterSpec
 
 private val Background = Color(0xFF101522)
 private val Panel = Color(0xFF1B2434)
@@ -34,6 +46,56 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/** Encrypts the developer token with a key held by Android Keystore. */
+private object SecureTokenStore {
+    private const val PREFS = "alisa_secure"
+    private const val KEY_ALIAS = "alisa_zello_token_key"
+    private const val IV_KEY = "token_iv"
+    private const val DATA_KEY = "token_data"
+
+    private fun secretKey(): SecretKey {
+        val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        val existing = keyStore.getKey(KEY_ALIAS, null) as? SecretKey
+        if (existing != null) return existing
+        val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
+        generator.init(
+            KeyGenParameterSpec.Builder(
+                KEY_ALIAS,
+                KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
+            ).setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                .setRandomizedEncryptionRequired(true)
+                .build()
+        )
+        return generator.generateKey()
+    }
+
+    fun save(context: android.content.Context, token: String) {
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey())
+        val encrypted = cipher.doFinal(token.toByteArray(StandardCharsets.UTF_8))
+        context.getSharedPreferences(PREFS, 0).edit()
+            .putString(IV_KEY, Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
+            .putString(DATA_KEY, Base64.encodeToString(encrypted, Base64.NO_WRAP))
+            .apply()
+    }
+
+    fun read(context: android.content.Context): String {
+        return runCatching {
+            val prefs = context.getSharedPreferences(PREFS, 0)
+            val iv = Base64.decode(prefs.getString(IV_KEY, null), Base64.NO_WRAP)
+            val data = Base64.decode(prefs.getString(DATA_KEY, null), Base64.NO_WRAP)
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(Cipher.DECRYPT_MODE, secretKey(), GCMParameterSpec(128, iv))
+            String(cipher.doFinal(data), StandardCharsets.UTF_8)
+        }.getOrDefault("")
+    }
+
+    fun clear(context: android.content.Context) {
+        context.getSharedPreferences(PREFS, 0).edit().clear().apply()
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AlisaApp() {
@@ -41,8 +103,9 @@ private fun AlisaApp() {
     val preferences = remember(context) { context.getSharedPreferences("alisa_radio", 0) }
     var assistantEnabled by remember { mutableStateOf(false) }
     var newChannel by remember { mutableStateOf("") }
+    var tokenInput by remember { mutableStateOf(SecureTokenStore.read(context)) }
+    var tokenSaved by remember { mutableStateOf(tokenInput.isNotBlank()) }
 
-    // Channel names are stored locally and restored whenever the app is reopened.
     val channels = remember(context) {
         mutableStateListOf<String>().apply {
             val saved = preferences.getStringSet("channels", null)
@@ -70,9 +133,42 @@ private fun AlisaApp() {
                             Spacer(Modifier.height(14.dp))
                             Text(if (assistantEnabled) "Алиса включена" else "Алиса выключена", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                             Spacer(Modifier.height(6.dp))
-                            Text("Голосовое подключение пока не настроено.", color = Color.LightGray, fontSize = 13.sp)
+                            Text("Подключение будет доступно после настройки Zello.", color = Color.LightGray, fontSize = 13.sp)
                             Spacer(Modifier.height(18.dp))
                             Button(onClick = { assistantEnabled = !assistantEnabled }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) { Text(if (assistantEnabled) "Выключить" else "Включить") }
+                        }
+                    }
+                }
+                item {
+                    Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
+                        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text("Токен Zello Developer", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                            Text(if (tokenSaved) "Токен сохранён на этом телефоне." else "Вставь сюда свой Sample Development Token. Сам токен никому не отправляй.", color = Color.LightGray, fontSize = 12.sp)
+                            OutlinedTextField(
+                                value = tokenInput,
+                                onValueChange = { tokenInput = it; tokenSaved = false },
+                                modifier = Modifier.fillMaxWidth(),
+                                label = { Text("Токен разработчика") },
+                                singleLine = true,
+                                visualTransformation = PasswordVisualTransformation(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(onClick = {
+                                    val value = tokenInput.trim()
+                                    if (value.isNotEmpty()) {
+                                        runCatching { SecureTokenStore.save(context, value) }
+                                            .onSuccess { tokenSaved = true }
+                                            .onFailure { tokenSaved = false }
+                                    }
+                                }, modifier = Modifier.weight(1f), enabled = tokenInput.isNotBlank()) { Text("Сохранить токен") }
+                                OutlinedButton(onClick = {
+                                    SecureTokenStore.clear(context)
+                                    tokenInput = ""
+                                    tokenSaved = false
+                                }) { Text("Очистить") }
+                            }
+                            Text("Хранение защищено шифрованием Android Keystore. Пока токен только сохраняется — подключение к серверу Zello ещё не включено.", color = Color.LightGray, fontSize = 11.sp)
                         }
                     }
                 }
@@ -82,7 +178,7 @@ private fun AlisaApp() {
                         Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text(channel, color = Color.White, fontWeight = FontWeight.Medium)
-                                Text("Ещё не подключён к Zello", color = Color.LightGray, fontSize = 12.sp)
+                                Text("Ожидает подключения к Zello", color = Color.LightGray, fontSize = 12.sp)
                             }
                             TextButton(onClick = { channels.remove(channel) }) { Text("Удалить") }
                         }
@@ -98,7 +194,7 @@ private fun AlisaApp() {
                         Icon(Icons.Default.Add, contentDescription = null); Spacer(Modifier.width(8.dp)); Text("Добавить канал")
                     }
                 }
-                item { Text("Список каналов сохраняется на телефоне. Реальное подключение к Zello, голосовой помощник и передача музыки — следующие этапы разработки.", color = Color.LightGray, fontSize = 12.sp) }
+                item { Text("Каналы и токен сохраняются на телефоне. Реальное подключение к Zello, голосовой помощник и передача музыки ещё разрабатываются.", color = Color.LightGray, fontSize = 12.sp) }
             }
         }
     }
