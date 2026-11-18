@@ -3,7 +3,7 @@ name: Android APK build
 on:
   workflow_dispatch:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, fix/repeated-voice-requests ]
   pull_request:
     branches: [ main, master ]
 
