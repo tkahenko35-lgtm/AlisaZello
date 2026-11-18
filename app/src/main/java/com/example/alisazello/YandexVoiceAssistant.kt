@@ -3,6 +3,7 @@ package com.example.alisazello
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import com.zello.channel.sdk.IncomingVoiceConfiguration
 import com.zello.channel.sdk.IncomingVoiceStream
 import com.zello.channel.sdk.OutgoingVoiceConfiguration
@@ -18,6 +19,7 @@ import java.net.URL
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import org.json.JSONObject
 
@@ -27,9 +29,16 @@ import org.json.JSONObject
  * It never opens or records the phone microphone.
  */
 internal object YandexVoiceAssistant {
-    private val worker = Executors.newSingleThreadExecutor()
+    // Network requests and outgoing audio must not share one worker: a long Zello
+    // voice transmission must never block recognition of the next channel request.
+    private val requestWorker = Executors.newSingleThreadExecutor()
+    private val audioWorker = Executors.newCachedThreadPool()
     private val main = Handler(Looper.getMainLooper())
     private const val TARGET_RATE = 16000
+    // After a user says "Алиса", keep that user's dialogue open for two minutes.
+    // Each new question refreshes the window; other channel users have separate sessions.
+    private const val DIALOG_WINDOW_MS = 120_000L
+    private val activeDialogs = ConcurrentHashMap<String, Long>()
 
     fun incomingConfiguration(onAudio: (String, ShortArray, Int) -> Unit): IncomingVoiceConfiguration {
         val receiver = object : VoiceReceiver {
@@ -55,6 +64,7 @@ internal object YandexVoiceAssistant {
                 if (bytes.isEmpty()) return
                 val samples = ShortArray(bytes.size / 2)
                 ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(samples)
+                Log.d("AlisaRadio", "Incoming voice stopped: sender=$senderName samples=${samples.size} rate=$rate")
                 onAudio(senderName, samples, rate)
             }
         }
@@ -70,12 +80,22 @@ internal object YandexVoiceAssistant {
         sampleRate: Int,
         onReply: (String, ShortArray?) -> Unit
     ) {
-        worker.execute {
+        requestWorker.execute {
+            Log.d("AlisaRadio", "Processing request from $sender, samples=${pcm.size}, rate=$sampleRate")
             try {
                 val normalized = resample(pcm, sampleRate, TARGET_RATE)
                 val recognized = recognize(apiKey, folderId, normalized)
-                if (recognized.isBlank() || !recognized.contains(Regex("алис[аы]", RegexOption.IGNORE_CASE))) return@execute
-                val question = recognized.replace(Regex("(?i)алис[аы][,!. ]*"), "").trim()
+                val cleanText = recognized.trim()
+                val hasWakeWord = cleanText.contains(Regex("алис[аы]", RegexOption.IGNORE_CASE))
+                val now = System.currentTimeMillis()
+                val dialogActive = (activeDialogs[sender] ?: 0L) > now
+                Log.d("AlisaRadio", "Speech recognized: chars=${cleanText.length}, wakeWord=$hasWakeWord, dialogActive=$dialogActive")
+                if (cleanText.isBlank() || (!hasWakeWord && !dialogActive)) return@execute
+
+                // Wake word starts a dialogue; follow-up questions from the same
+                // participant are accepted without repeating "Алиса".
+                activeDialogs[sender] = now + DIALOG_WINDOW_MS
+                val question = cleanText.replace(Regex("(?i)алис[аы][,!. ]*"), "").trim()
                 if (question.isBlank()) {
                     val phrase = "Я здесь. Говори, не стесняйся."
                     onReply(phrase, synthesize(apiKey, folderId, phrase))
@@ -86,9 +106,14 @@ internal object YandexVoiceAssistant {
                 } else {
                     ask(apiKey, folderId, sender, question)
                 }
-                onReply(answer, synthesize(apiKey, folderId, answer))
+                val replyAudio = synthesize(apiKey, folderId, answer)
+                Log.d("AlisaRadio", "Reply synthesized: chars=${answer.length}, samples=${replyAudio.size}")
+                onReply(answer, replyAudio)
             } catch (e: Exception) {
-                onReply("Не смогла обработать запрос Яндекса: ${safeError(e)}", null)
+                Log.e("AlisaRadio", "Request processing failed", e)
+                val message = "Не смогла обработать запрос: ${safeError(e)}"
+                val fallbackAudio = runCatching { synthesize(apiKey, folderId, message) }.getOrNull()
+                onReply(message, fallbackAudio)
             }
         }
     }
@@ -101,7 +126,7 @@ internal object YandexVoiceAssistant {
 
             override fun startProvidingAudio(sink: VoiceSink, sampleRate: Int, stream: OutgoingVoiceStream) {
                 activeSink = sink
-                worker.execute {
+                audioWorker.execute {
                     try {
                         var offset = 0
                         while (!stopped && offset < audio.size) {
