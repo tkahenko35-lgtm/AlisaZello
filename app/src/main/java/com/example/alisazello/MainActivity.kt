@@ -205,7 +205,7 @@ private fun AlisaApp() {
                             Spacer(Modifier.height(14.dp))
                             Text(if (assistantEnabled) "Алиса включена" else "Алиса выключена", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                             Spacer(Modifier.height(6.dp))
-                            Text("Подключение будет доступно после настройки Zello.", color = Color.LightGray, fontSize = 13.sp)
+                            Text(connectionStatus, color = Color.LightGray, fontSize = 13.sp)
                             Spacer(Modifier.height(18.dp))
                             Button(onClick = { assistantEnabled = !assistantEnabled }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) { Text(if (assistantEnabled) "Выключить" else "Включить") }
                         }
@@ -240,7 +240,7 @@ private fun AlisaApp() {
                                     tokenSaved = false
                                 }) { Text("Очистить") }
                             }
-                            Text("Хранение защищено шифрованием Android Keystore. Пока токен только сохраняется — подключение к серверу Zello ещё не включено.", color = Color.LightGray, fontSize = 11.sp)
+                            Text("Токен хранится зашифрованным. Сохрани его, затем нажми «Подключить» у нужного канала. Без логина и пароля аккаунта доступно только прослушивание.", color = Color.LightGray, fontSize = 11.sp)
                         }
                     }
                 }
