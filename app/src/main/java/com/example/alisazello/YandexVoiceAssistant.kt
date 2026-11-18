@@ -19,6 +19,7 @@ import java.net.URL
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import org.json.JSONObject
 
@@ -34,6 +35,10 @@ internal object YandexVoiceAssistant {
     private val audioWorker = Executors.newCachedThreadPool()
     private val main = Handler(Looper.getMainLooper())
     private const val TARGET_RATE = 16000
+    // After a user says "Алиса", keep that user's dialogue open for two minutes.
+    // Each new question refreshes the window; other channel users have separate sessions.
+    private const val DIALOG_WINDOW_MS = 120_000L
+    private val activeDialogs = ConcurrentHashMap<String, Long>()
 
     fun incomingConfiguration(onAudio: (String, ShortArray, Int) -> Unit): IncomingVoiceConfiguration {
         val receiver = object : VoiceReceiver {
@@ -80,10 +85,17 @@ internal object YandexVoiceAssistant {
             try {
                 val normalized = resample(pcm, sampleRate, TARGET_RATE)
                 val recognized = recognize(apiKey, folderId, normalized)
-                val hasWakeWord = recognized.contains(Regex("алис[аы]", RegexOption.IGNORE_CASE))
-                Log.d("AlisaRadio", "Speech recognized: chars=${recognized.length}, wakeWord=$hasWakeWord")
-                if (recognized.isBlank() || !hasWakeWord) return@execute
-                val question = recognized.replace(Regex("(?i)алис[аы][,!. ]*"), "").trim()
+                val cleanText = recognized.trim()
+                val hasWakeWord = cleanText.contains(Regex("алис[аы]", RegexOption.IGNORE_CASE))
+                val now = System.currentTimeMillis()
+                val dialogActive = (activeDialogs[sender] ?: 0L) > now
+                Log.d("AlisaRadio", "Speech recognized: chars=${cleanText.length}, wakeWord=$hasWakeWord, dialogActive=$dialogActive")
+                if (cleanText.isBlank() || (!hasWakeWord && !dialogActive)) return@execute
+
+                // Wake word starts a dialogue; follow-up questions from the same
+                // participant are accepted without repeating "Алиса".
+                activeDialogs[sender] = now + DIALOG_WINDOW_MS
+                val question = cleanText.replace(Regex("(?i)алис[аы][,!. ]*"), "").trim()
                 if (question.isBlank()) {
                     val phrase = "Я здесь. Говори, не стесняйся."
                     onReply(phrase, synthesize(apiKey, folderId, phrase))
