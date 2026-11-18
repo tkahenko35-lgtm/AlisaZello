@@ -45,7 +45,6 @@ jobs:
           if-no-files-found: error
       - name: Restore permanent signing key
         if: ${{ env.KEYSTORE_BASE64 != '' }}
-        env:
         run: |
           echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/alisaradio-release.jks"
           echo "KEYSTORE_FILE=$RUNNER_TEMP/alisaradio-release.jks" >> "$GITHUB_ENV"
@@ -55,7 +54,7 @@ jobs:
           KEYSTORE_FILE: ${{ env.KEYSTORE_FILE }}
         run: gradle --no-daemon assembleRelease
       - name: Upload permanently signed APK
-        if: ${{ secrets.KEYSTORE_BASE64 != '' && secrets.KEYSTORE_PASSWORD != '' && secrets.KEY_ALIAS != '' && secrets.KEY_PASSWORD != '' }}
+        if: ${{ env.KEYSTORE_BASE64 != '' && env.KEYSTORE_PASSWORD != '' && env.KEY_ALIAS != '' && env.KEY_PASSWORD != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: AlisaRadio-signed-apk
