@@ -285,7 +285,17 @@ private fun AlisaApp() {
             override fun onOutgoingVoiceError(session: Session, stream: OutgoingVoiceStream, error: OutgoingVoiceStreamError) {}
             override fun onOutgoingVoiceStateChanged(session: Session, stream: OutgoingVoiceStream) {}
             override fun onOutgoingVoiceProgress(session: Session, stream: OutgoingVoiceStream, positionMs: Int) {}
-            override fun onIncomingVoiceWillStart(session: Session, streamInfo: IncomingVoiceStreamInfo): IncomingVoiceConfiguration? = null
+            override fun onIncomingVoiceWillStart(session: Session, streamInfo: IncomingVoiceStreamInfo): IncomingVoiceConfiguration? {
+                if (!assistantEnabled) return null
+                val yandex = YandexCredentialStore.read(context) ?: return null
+                return YandexVoiceAssistant.incomingConfiguration { sender, audio, sampleRate ->
+                    YandexVoiceAssistant.processRequest(yandex.first, yandex.second, sender, audio, sampleRate) { _, replyAudio ->
+                        if (replyAudio != null && assistantEnabled) {
+                            YandexVoiceAssistant.speakInChannel(session, replyAudio)
+                        }
+                    }
+                }
+            }
             override fun onIncomingVoiceStarted(session: Session, stream: IncomingVoiceStream) {}
             override fun onIncomingVoiceStopped(session: Session, stream: IncomingVoiceStream) {}
             override fun onIncomingVoiceProgress(session: Session, stream: IncomingVoiceStream, positionMs: Int) {}
