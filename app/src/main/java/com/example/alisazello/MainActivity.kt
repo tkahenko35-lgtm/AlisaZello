@@ -160,23 +160,23 @@ private fun AlisaApp() {
         }
     }
 
-    fun disconnectZello() {
+    fun disconnectZello(resetRetry: Boolean = true) {
         reconnectRunnable?.let(reconnectHandler::removeCallbacks)
         reconnectRunnable = null
         zelloSession?.disconnect()
         zelloSession = null
         connectedChannel = null
-        reconnectAttempt = 0
+        if (resetRetry) reconnectAttempt = 0
         connectionStatus = "Не подключено"
     }
 
-    fun connectZello(channel: String) {
+    fun connectZello(channel: String, isAutomaticRetry: Boolean = false) {
         val token = SecureTokenStore.read(context)
         if (token.isBlank()) {
             connectionStatus = "Сначала сохрани токен Zello Developer"
             return
         }
-        disconnectZello()
+        disconnectZello(resetRetry = !isAutomaticRetry)
         connectionStatus = "Подключаемся к «$channel»…"
         connectedChannel = channel
         val credentials = SecureCredentialStore.read(context)
@@ -216,7 +216,7 @@ private fun AlisaApp() {
                 val retry = Runnable {
                     reconnectRunnable = null
                     if (zelloSession == null && connectedChannel == null && tokenSaved) {
-                        connectZello(channel)
+                        connectZello(channel, isAutomaticRetry = true)
                     }
                 }
                 reconnectRunnable?.let(reconnectHandler::removeCallbacks)
