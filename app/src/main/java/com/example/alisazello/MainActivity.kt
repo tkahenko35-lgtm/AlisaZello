@@ -28,6 +28,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.zello.channel.sdk.*
 import java.nio.charset.StandardCharsets
 import java.security.KeyStore
 import javax.crypto.Cipher
@@ -105,6 +106,9 @@ private fun AlisaApp() {
     var newChannel by remember { mutableStateOf("") }
     var tokenInput by remember { mutableStateOf(SecureTokenStore.read(context)) }
     var tokenSaved by remember { mutableStateOf(tokenInput.isNotBlank()) }
+    var connectionStatus by remember { mutableStateOf("Не подключено") }
+    var connectedChannel by remember { mutableStateOf<String?>(null) }
+    var zelloSession by remember { mutableStateOf<Session?>(null) }
 
     val channels = remember(context) {
         mutableStateListOf<String>().apply {
@@ -114,6 +118,74 @@ private fun AlisaApp() {
     }
     LaunchedEffect(channels.toList()) {
         preferences.edit().putStringSet("channels", LinkedHashSet(channels)).apply()
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { zelloSession?.disconnect() }
+    }
+
+    fun disconnectZello() {
+        zelloSession?.disconnect()
+        zelloSession = null
+        connectedChannel = null
+        connectionStatus = "Не подключено"
+    }
+
+    fun connectZello(channel: String) {
+        val token = SecureTokenStore.read(context)
+        if (token.isBlank()) {
+            connectionStatus = "Сначала сохрани токен Zello Developer"
+            return
+        }
+        disconnectZello()
+        connectionStatus = "Подключаемся к «$channel»…"
+        connectedChannel = channel
+        val newSession = Session.Builder(context, "wss://zello.io/ws", token, channel)
+            .setLogger(SessionLogger.NONE)
+            .build()
+        newSession.sessionListener = object : SessionListener {
+            override fun onConnectStarted(session: Session) {
+                connectionStatus = "Устанавливаем соединение с «$channel»…"
+            }
+            override fun onConnectFailed(session: Session, error: SessionConnectError) {
+                connectionStatus = when (error.code) {
+                    SessionConnectError.Code.BAD_CREDENTIALS -> "Zello отклонил токен. Проверь его срок действия."
+                    SessionConnectError.Code.CONNECT_FAILED -> "Не удалось открыть соединение. Проверь интернет."
+                    SessionConnectError.Code.INVALID_ADDRESS -> "Неверный адрес сервера Zello."
+                    SessionConnectError.Code.NO_RESPONSE -> "Zello не ответил вовремя. Попробуй ещё раз."
+                    else -> "Ошибка подключения Zello: $error"
+                }
+                connectedChannel = null
+                zelloSession = null
+            }
+            override fun onConnectSucceeded(session: Session) {
+                connectionStatus = "Подключено к «$channel» — режим прослушивания"
+                connectedChannel = channel
+            }
+            override fun onDisconnected(session: Session) {
+                connectionStatus = "Соединение с Zello закрыто"
+                connectedChannel = null
+                zelloSession = null
+            }
+            override fun onSessionWillReconnect(session: Session, reason: ReconnectReason): Boolean {
+                connectionStatus = "Связь потеряна. Zello переподключается…"
+                return true
+            }
+            override fun onOutgoingVoiceError(session: Session, stream: OutgoingVoiceStream, error: OutgoingVoiceStreamError) {}
+            override fun onOutgoingVoiceStateChanged(session: Session, stream: OutgoingVoiceStream) {}
+            override fun onOutgoingVoiceProgress(session: Session, stream: OutgoingVoiceStream, positionMs: Int) {}
+            override fun onIncomingVoiceStarted(session: Session, stream: IncomingVoiceStream) {}
+            override fun onIncomingVoiceStopped(session: Session, stream: IncomingVoiceStream) {}
+            override fun onIncomingVoiceProgress(session: Session, stream: IncomingVoiceStream, positionMs: Int) {}
+            override fun onTextMessage(session: Session, sender: String, message: String) {}
+            override fun onLocationMessage(session: Session, sender: String, location: Location) {}
+        }
+        zelloSession = newSession
+        if (!newSession.connect()) {
+            connectionStatus = "Не удалось запустить подключение. Проверь токен и название канала."
+            connectedChannel = null
+            zelloSession = null
+        }
     }
 
     MaterialTheme(colorScheme = darkColorScheme(primary = Accent, background = Background, surface = Panel)) {
@@ -178,9 +250,15 @@ private fun AlisaApp() {
                         Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text(channel, color = Color.White, fontWeight = FontWeight.Medium)
-                                Text("Ожидает подключения к Zello", color = Color.LightGray, fontSize = 12.sp)
+                                Text(if (connectedChannel == channel) connectionStatus else "Zello Friends & Family", color = Color.LightGray, fontSize = 12.sp)
                             }
-                            TextButton(onClick = { channels.remove(channel) }) { Text("Удалить") }
+                            Button(onClick = { connectZello(channel) }, enabled = tokenSaved && connectedChannel != channel) {
+                                Text(if (connectedChannel == channel) "Подключено" else "Подключить")
+                            }
+                            TextButton(onClick = {
+                                if (connectedChannel == channel) disconnectZello()
+                                channels.remove(channel)
+                            }) { Text("Удалить") }
                         }
                     }
                 }
@@ -194,7 +272,7 @@ private fun AlisaApp() {
                         Icon(Icons.Default.Add, contentDescription = null); Spacer(Modifier.width(8.dp)); Text("Добавить канал")
                     }
                 }
-                item { Text("Каналы и токен сохраняются на телефоне. Реальное подключение к Zello, голосовой помощник и передача музыки ещё разрабатываются.", color = Color.LightGray, fontSize = 12.sp) }
+                item { Text("Подключение без логина и пароля Zello работает только на прослушивание. Для передачи голоса и музыки потребуется авторизация аккаунта. Алиса и музыкальный поток ещё разрабатываются.", color = Color.LightGray, fontSize = 12.sp) }
             }
         }
     }
