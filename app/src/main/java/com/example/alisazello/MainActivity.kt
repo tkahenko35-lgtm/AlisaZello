@@ -197,6 +197,21 @@ private fun AlisaApp() {
                 }
                 connectedChannel = null
                 zelloSession = null
+                if (error.code != SessionConnectError.Code.BAD_CREDENTIALS &&
+                    error.code != SessionConnectError.Code.INVALID_ADDRESS) {
+                    val delayMs = minOf(5_000L * (1L shl reconnectAttempt.coerceAtMost(4)), 60_000L)
+                    reconnectAttempt += 1
+                    connectionStatus = "Не удалось подключиться. Повторная попытка через ${delayMs / 1000} сек…"
+                    val retry = Runnable {
+                        reconnectRunnable = null
+                        if (zelloSession == null && connectedChannel == null && tokenSaved) {
+                            connectZello(channel, isAutomaticRetry = true)
+                        }
+                    }
+                    reconnectRunnable?.let(reconnectHandler::removeCallbacks)
+                    reconnectRunnable = retry
+                    reconnectHandler.postDelayed(retry, delayMs)
+                }
             }
             override fun onConnectSucceeded(session: Session) {
                 if (zelloSession !== session) return
@@ -240,9 +255,20 @@ private fun AlisaApp() {
         }
         zelloSession = newSession
         if (!newSession.connect()) {
-            connectionStatus = "Не удалось запустить подключение. Проверь токен и название канала."
             connectedChannel = null
             zelloSession = null
+            val delayMs = minOf(5_000L * (1L shl reconnectAttempt.coerceAtMost(4)), 60_000L)
+            reconnectAttempt += 1
+            connectionStatus = "Не удалось запустить подключение. Повтор через ${delayMs / 1000} сек…"
+            val retry = Runnable {
+                reconnectRunnable = null
+                if (zelloSession == null && connectedChannel == null && tokenSaved) {
+                    connectZello(channel, isAutomaticRetry = true)
+                }
+            }
+            reconnectRunnable?.let(reconnectHandler::removeCallbacks)
+            reconnectRunnable = retry
+            reconnectHandler.postDelayed(retry, delayMs)
         }
     }
 
