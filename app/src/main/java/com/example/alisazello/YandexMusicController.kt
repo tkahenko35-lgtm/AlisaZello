@@ -44,11 +44,11 @@ internal object YandexMusicController {
                 "Сделала тише системную громкость мультимедиа."
             }
             else -> {
-                val query = text.replace(Regex("(?i)^(пожалуйста[, ]*)?(включи|поставь|запусти|найди и включи|сыграй|воспроизведи)\\s*"), "").trim()
+                val query = text.replace(Regex("(?i)^(пожалуйста[, ]*)?(найди и включи|включи|поставь|запусти|сыграй|воспроизведи)(?:\\s+(?:музыку|песню|трек|композицию))?\\s*"), "").trim()
                 if (query.isBlank()) return "Скажи название песни или исполнителя."
                 val intent = Intent(MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH).apply {
                     setPackage(PACKAGE)
-                    putExtra(MediaStore.EXTRA_MEDIA_FOCUS, "vnd.android.cursor.item/*")
+                    putExtra(MediaStore.EXTRA_MEDIA_FOCUS, "vnd.android.cursor.item/audio")
                     putExtra(SearchManager.QUERY, query)
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
