@@ -48,7 +48,7 @@ internal object YandexMusicController {
                 if (query.isBlank()) return "Скажи название песни или исполнителя."
                 val intent = Intent(MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH).apply {
                     setPackage(PACKAGE)
-                    putExtra(MediaStore.EXTRA_MEDIA_FOCUS, "vnd.android.cursor.item/audio")
+                    putExtra(MediaStore.EXTRA_MEDIA_FOCUS, "vnd.android.cursor.item/*")
                     putExtra(SearchManager.QUERY, query)
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
