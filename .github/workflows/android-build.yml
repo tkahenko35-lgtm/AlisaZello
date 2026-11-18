@@ -79,8 +79,6 @@ jobs:
           echo "KEYSTORE_FILE=$RUNNER_TEMP/alisaradio-release.jks" >> "$GITHUB_ENV"
 
       - name: Build signed release APK
-        env:
-          KEYSTORE_FILE: ${{ env.KEYSTORE_FILE }}
         run: gradle --no-daemon assembleRelease
       - name: Upload signed release APK
         uses: actions/upload-artifact@v4
