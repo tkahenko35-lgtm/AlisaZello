@@ -48,6 +48,30 @@ class MainActivity : ComponentActivity() {
 }
 
 /** Encrypts the developer token with a key held by Android Keystore. */
+private object SecureCredentialStore {
+    private const val PREFS = "alisa_secure_credentials"
+    private const val KEY_ALIAS = "alisa_zello_credentials_key"
+    private fun key(): SecretKey {
+        val ks = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        (ks.getKey(KEY_ALIAS, null) as? SecretKey)?.let { return it }
+        val gen = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
+        gen.init(KeyGenParameterSpec.Builder(KEY_ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT).setBlockModes(KeyProperties.BLOCK_MODE_GCM).setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE).setRandomizedEncryptionRequired(true).build())
+        return gen.generateKey()
+    }
+    fun save(context: android.content.Context, username: String, password: String) {
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding"); cipher.init(Cipher.ENCRYPT_MODE, key())
+        val bytes = cipher.doFinal((username + String(charArrayOf(10)) + password).toByteArray(StandardCharsets.UTF_8))
+        context.getSharedPreferences(PREFS, 0).edit().putString("iv", Base64.encodeToString(cipher.iv, Base64.NO_WRAP)).putString("data", Base64.encodeToString(bytes, Base64.NO_WRAP)).apply()
+    }
+    fun read(context: android.content.Context): Pair<String, String>? = runCatching {
+        val p = context.getSharedPreferences(PREFS, 0); val iv = p.getString("iv", null) ?: return null; val data = p.getString("data", null) ?: return null
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding"); cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, Base64.decode(iv, Base64.NO_WRAP)))
+        val decoded = String(cipher.doFinal(Base64.decode(data, Base64.NO_WRAP)), StandardCharsets.UTF_8); val i = decoded.indexOf(10)
+        if (i <= 0) null else Pair(decoded.substring(0, i), decoded.substring(i + 1))
+    }.getOrNull()
+    fun clear(context: android.content.Context) { context.getSharedPreferences(PREFS, 0).edit().clear().apply() }
+}
+
 private object SecureTokenStore {
     private const val PREFS = "alisa_secure"
     private const val KEY_ALIAS = "alisa_zello_token_key"
@@ -106,6 +130,9 @@ private fun AlisaApp() {
     var newChannel by remember { mutableStateOf("") }
     var tokenInput by remember { mutableStateOf(SecureTokenStore.read(context)) }
     var tokenSaved by remember { mutableStateOf(tokenInput.isNotBlank()) }
+    var zelloUsername by remember { mutableStateOf(SecureCredentialStore.read(context)?.first.orEmpty()) }
+    var zelloPassword by remember { mutableStateOf(SecureCredentialStore.read(context)?.second.orEmpty()) }
+    var credentialsSaved by remember { mutableStateOf(SecureCredentialStore.read(context) != null) }
     var connectionStatus by remember { mutableStateOf("Не подключено") }
     var connectedChannel by remember { mutableStateOf<String?>(null) }
     var zelloSession by remember { mutableStateOf<Session?>(null) }
@@ -140,8 +167,10 @@ private fun AlisaApp() {
         disconnectZello()
         connectionStatus = "Подключаемся к «$channel»…"
         connectedChannel = channel
-        val newSession = Session.Builder(context, "wss://zello.io/ws", token, channel)
-            .build()
+        val credentials = SecureCredentialStore.read(context)
+        val builder = Session.Builder(context, "wss://zello.io/ws", token, channel)
+        if (credentials != null) builder.setUsername(credentials.first, credentials.second)
+        val newSession = builder.build()
         newSession.sessionListener = object : SessionListener {
             override fun onConnectStarted(session: Session) {
                 connectionStatus = "Устанавливаем соединение с «$channel»…"
@@ -242,6 +271,21 @@ private fun AlisaApp() {
                                 }) { Text("Очистить") }
                             }
                             Text("Токен хранится зашифрованным. Сохрани его, затем нажми «Подключить» у нужного канала. Без логина и пароля аккаунта доступно только прослушивание.", color = Color.LightGray, fontSize = 11.sp)
+                        }
+                    }
+                }
+                item {
+                    Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
+                        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text("Аккаунт Zello", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                            Text(if (credentialsSaved) "Данные аккаунта сохранены на телефоне." else "Для передачи голоса и музыки нужен вход в аккаунт. Без него доступно только прослушивание.", color = Color.LightGray, fontSize = 12.sp)
+                            OutlinedTextField(value = zelloUsername, onValueChange = { zelloUsername = it; credentialsSaved = false }, modifier = Modifier.fillMaxWidth(), label = { Text("Имя пользователя Zello") }, singleLine = true)
+                            OutlinedTextField(value = zelloPassword, onValueChange = { zelloPassword = it; credentialsSaved = false }, modifier = Modifier.fillMaxWidth(), label = { Text("Пароль Zello") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(onClick = { val user = zelloUsername.trim(); if (user.isNotEmpty() && zelloPassword.isNotEmpty()) runCatching { SecureCredentialStore.save(context, user, zelloPassword) }.onSuccess { credentialsSaved = true }.onFailure { credentialsSaved = false } }, modifier = Modifier.weight(1f), enabled = zelloUsername.isNotBlank() && zelloPassword.isNotBlank()) { Text("Сохранить вход") }
+                                OutlinedButton(onClick = { SecureCredentialStore.clear(context); zelloUsername = ""; zelloPassword = ""; credentialsSaved = false; if (connectedChannel != null) disconnectZello() }) { Text("Очистить") }
+                            }
+                            Text("Логин и пароль шифруются на телефоне. Не присылай их в чат. После сохранения переподключи канал.", color = Color.LightGray, fontSize = 11.sp)
                         }
                     }
                 }
