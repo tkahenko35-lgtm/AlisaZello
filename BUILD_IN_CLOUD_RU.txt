@@ -1,0 +1,6 @@
+СБОРКА APK В ОБЛАКЕ
+
+GitHub Actions workflow находится в .github/workflows/android-build.yml.
+Он устанавливает Java 21, Android SDK platform 36 и Gradle 8.13, затем запускает assembleDebug и публикует APK как artifact AlisaRadio-debug-apk.
+
+Важно: текущая версия — только интерфейсный прототип. В ней нет реального входа в Zello, передачи звука Яндекс Музыки или AI-ответов.
