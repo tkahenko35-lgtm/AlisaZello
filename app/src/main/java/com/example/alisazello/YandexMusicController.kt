@@ -19,27 +19,27 @@ internal object YandexMusicController {
         val text = command.trim()
         val lower = text.lowercase()
         return when {
-            Regex("(?i)\\b(следующ|дальше|следующий трек)\\b").containsMatchIn(text) -> {
+            Regex("(?i)(следующ|дальше|следующий трек)").containsMatchIn(text) -> {
                 sendMediaKey(context, KeyEvent.KEYCODE_MEDIA_NEXT)
                 "Передала Яндекс Музыке команду «следующий трек»."
             }
-            Regex("(?i)\\b(предыдущ|назад)\\b").containsMatchIn(text) -> {
+            Regex("(?i)(предыдущ|назад)").containsMatchIn(text) -> {
                 sendMediaKey(context, KeyEvent.KEYCODE_MEDIA_PREVIOUS)
                 "Передала команду вернуться к предыдущему треку."
             }
-            Regex("(?i)\\b(пауза|останови|выключи музыку|стоп музыка)\\b").containsMatchIn(text) -> {
+            Regex("(?i)(пауза|останови|выключи музыку|стоп музыка)").containsMatchIn(text) -> {
                 sendMediaKey(context, KeyEvent.KEYCODE_MEDIA_PAUSE)
                 "Отправила Яндекс Музыке команду паузы."
             }
-            Regex("(?i)\\b(продолжи|возобнови|играй дальше)\\b").containsMatchIn(text) -> {
+            Regex("(?i)(продолжи|возобнови|играй дальше)").containsMatchIn(text) -> {
                 sendMediaKey(context, KeyEvent.KEYCODE_MEDIA_PLAY)
                 "Отправила команду продолжить воспроизведение."
             }
-            Regex("(?i)\\b(громче|увеличь громкость)\\b").containsMatchIn(text) -> {
+            Regex("(?i)(громче|увеличь громкость)").containsMatchIn(text) -> {
                 adjustVolume(context, AudioManager.ADJUST_RAISE)
                 "Сделала громче системную громкость мультимедиа."
             }
-            Regex("(?i)\\b(тише|уменьши громкость)\\b").containsMatchIn(text) -> {
+            Regex("(?i)(тише|уменьши громкость)").containsMatchIn(text) -> {
                 adjustVolume(context, AudioManager.ADJUST_LOWER)
                 "Сделала тише системную громкость мультимедиа."
             }
