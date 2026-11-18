@@ -141,7 +141,6 @@ private fun AlisaApp() {
         connectionStatus = "Подключаемся к «$channel»…"
         connectedChannel = channel
         val newSession = Session.Builder(context, "wss://zello.io/ws", token, channel)
-            .setLogger(SessionLogger.NONE)
             .build()
         newSession.sessionListener = object : SessionListener {
             override fun onConnectStarted(session: Session) {
@@ -174,10 +173,12 @@ private fun AlisaApp() {
             override fun onOutgoingVoiceError(session: Session, stream: OutgoingVoiceStream, error: OutgoingVoiceStreamError) {}
             override fun onOutgoingVoiceStateChanged(session: Session, stream: OutgoingVoiceStream) {}
             override fun onOutgoingVoiceProgress(session: Session, stream: OutgoingVoiceStream, positionMs: Int) {}
+            override fun onIncomingVoiceWillStart(session: Session, streamInfo: IncomingVoiceStreamInfo): IncomingVoiceConfiguration? = null
             override fun onIncomingVoiceStarted(session: Session, stream: IncomingVoiceStream) {}
             override fun onIncomingVoiceStopped(session: Session, stream: IncomingVoiceStream) {}
             override fun onIncomingVoiceProgress(session: Session, stream: IncomingVoiceStream, positionMs: Int) {}
             override fun onTextMessage(session: Session, sender: String, message: String) {}
+            override fun onImageMessage(session: Session, imageInfo: ImageInfo) {}
             override fun onLocationMessage(session: Session, sender: String, location: Location) {}
         }
         zelloSession = newSession
