@@ -289,7 +289,7 @@ private fun AlisaApp() {
                 if (!assistantEnabled) return null
                 val yandex = YandexCredentialStore.read(context) ?: return null
                 return YandexVoiceAssistant.incomingConfiguration { sender, audio, sampleRate ->
-                    YandexVoiceAssistant.processRequest(yandex.first, yandex.second, sender, audio, sampleRate) { _, replyAudio ->
+                    YandexVoiceAssistant.processRequest(context, yandex.first, yandex.second, sender, audio, sampleRate) { _, replyAudio ->
                         if (replyAudio != null && assistantEnabled) {
                             YandexVoiceAssistant.speakInChannel(session, replyAudio)
                         }
