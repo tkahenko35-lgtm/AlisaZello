@@ -27,7 +27,10 @@ import org.json.JSONObject
  * It never opens or records the phone microphone.
  */
 internal object YandexVoiceAssistant {
-    private val worker = Executors.newSingleThreadExecutor()
+    // Network requests and outgoing audio must not share one worker: a long Zello
+    // voice transmission must never block recognition of the next channel request.
+    private val requestWorker = Executors.newSingleThreadExecutor()
+    private val audioWorker = Executors.newCachedThreadPool()
     private val main = Handler(Looper.getMainLooper())
     private const val TARGET_RATE = 16000
 
@@ -70,7 +73,7 @@ internal object YandexVoiceAssistant {
         sampleRate: Int,
         onReply: (String, ShortArray?) -> Unit
     ) {
-        worker.execute {
+        requestWorker.execute {
             try {
                 val normalized = resample(pcm, sampleRate, TARGET_RATE)
                 val recognized = recognize(apiKey, folderId, normalized)
@@ -88,7 +91,9 @@ internal object YandexVoiceAssistant {
                 }
                 onReply(answer, synthesize(apiKey, folderId, answer))
             } catch (e: Exception) {
-                onReply("Не смогла обработать запрос Яндекса: ${safeError(e)}", null)
+                val message = "Не смогла обработать запрос: ${safeError(e)}"
+                val fallbackAudio = runCatching { synthesize(apiKey, folderId, message) }.getOrNull()
+                onReply(message, fallbackAudio)
             }
         }
     }
@@ -101,7 +106,7 @@ internal object YandexVoiceAssistant {
 
             override fun startProvidingAudio(sink: VoiceSink, sampleRate: Int, stream: OutgoingVoiceStream) {
                 activeSink = sink
-                worker.execute {
+                audioWorker.execute {
                     try {
                         var offset = 0
                         while (!stopped && offset < audio.size) {
