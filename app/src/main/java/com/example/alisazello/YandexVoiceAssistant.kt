@@ -1,5 +1,6 @@
 package com.example.alisazello
 
+import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import com.zello.channel.sdk.IncomingVoiceConfiguration
@@ -61,6 +62,7 @@ internal object YandexVoiceAssistant {
     }
 
     fun processRequest(
+        context: Context,
         apiKey: String,
         folderId: String,
         sender: String,
@@ -80,7 +82,7 @@ internal object YandexVoiceAssistant {
                     return@execute
                 }
                 val answer = if (isMusicCommand(question)) {
-                    "Запрос услышала: $question. Управление установленной Яндекс Музыкой и передача её аудио ещё не подключены."
+                    YandexMusicController.handle(context, question)
                 } else {
                     ask(apiKey, folderId, sender, question)
                 }
