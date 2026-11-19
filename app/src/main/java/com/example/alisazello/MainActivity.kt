@@ -27,7 +27,7 @@ class MainActivity : ComponentActivity() { override fun onCreate(savedInstanceSt
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable fun BotManagerApp() {
     var count by remember { mutableIntStateOf(50) }
-    var channel by remember { mutableStateOf("Умныенелюди") }\n    val channels = listOf("Умныенелюди", "Перелом", "~Мы Семья~")
+    var channel by remember { mutableStateOf("Умные нелюди") }\n    val channels = listOf("Умные нелюди", "Перелом", "~Мы Семья~")
     var topic by remember { mutableStateOf("Свободная беседа") }
     var running by remember { mutableStateOf(false) }
     var showList by remember { mutableStateOf(false) }
