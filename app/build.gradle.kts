@@ -45,5 +45,6 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("com.zello:zello-channel-sdk:0.5.2")
+    implementation("androidx.media3:media3-exoplayer:1.8.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
