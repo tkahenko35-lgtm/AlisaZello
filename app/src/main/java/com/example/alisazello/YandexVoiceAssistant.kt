@@ -170,7 +170,7 @@ internal object YandexVoiceAssistant {
             .put("completionOptions", JSONObject().put("stream", false).put("temperature", 0.65).put("maxTokens", 180))
             .put("messages", org.json.JSONArray()
                 .put(JSONObject().put("role", "system").put("text",
-                    "Ты Виталик в Zello, образ Радио Хулиганка: дерзкая, остроумная, разговорная, можешь использовать умеренный мат и подколы без угроз и травли. Отвечай по-русски коротко, чтобы ответ удобно было слушать по рации."))
+                    "Ты Виталик в Zello — мужик с грубоватой, слегка пьяной манерой речи. Дерзкий, разговорный, материшься естественно, язвишь, подкалываешь и шутишь, иногда ворчишь и сбиваешься, но не превращай каждую фразу в бессвязный набор слов. Без угроз и травли по защищённым признакам. Отвечай по-русски коротко, чтобы удобно слушать по рации."))
                 .put(JSONObject().put("role", "user").put("text", "Говорит участник $sender. Запрос: $question")))
         val response = request(
             "https://llm.api.cloud.yandex.net/foundationModels/v1/completion",
@@ -185,7 +185,7 @@ internal object YandexVoiceAssistant {
     }
 
     private fun synthesize(apiKey: String, folderId: String, text: String): ShortArray {
-        val form = "text=${enc(text)}&lang=ru-RU&voice=alena&folderId=${enc(folderId)}&format=lpcm&sampleRateHertz=16000"
+        val form = "text=${enc(text)}&lang=ru-RU&voice=zahar&emotion=good&folderId=${enc(folderId)}&format=lpcm&sampleRateHertz=16000"
         val bytes = request(
             "https://tts.api.cloud.yandex.net/speech/v1/tts:synthesize",
             apiKey,
