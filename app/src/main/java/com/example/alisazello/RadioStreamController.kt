@@ -42,6 +42,7 @@ internal object RadioStreamController {
     @Volatile private var running = false
     @Volatile private var selectedStation = ""
     @Volatile private var lastStationUuid = ""
+    private var pendingStart: Runnable? = null
 
     fun isRadioCommand(text: String): Boolean = Regex("(?i)(радио|станци|включи музыку|поставь музыку|играй музыку|следующ.*станц|останови музыку|выключи музыку|стоп музыка)").containsMatchIn(text)
     fun isStopCommand(text: String): Boolean = Regex("(?i)(стоп радио|выключи радио|останови радио|останови музыку|выключи музыку|стоп музыка)").containsMatchIn(text)
@@ -77,12 +78,19 @@ internal object RadioStreamController {
         lastStationUuid = chosen?.optString("stationuuid").orEmpty()
         stop()
         selectedStation = stationName
-        main.postDelayed({ startTransmission(context, session, streamUrl) }, 4500L)
+        val start = Runnable {
+            pendingStart = null
+            startTransmission(context, session, streamUrl)
+        }
+        pendingStart = start
+        main.postDelayed(start, 4500L)
         return "Нашёл станцию «" + stationName + "». Сейчас включу её в канал Zello."
     }
 
     fun stop() {
         running = false
+        pendingStart?.let(main::removeCallbacks)
+        pendingStart = null
         main.post {
             runCatching { voiceStream?.stop() }
             voiceStream = null
