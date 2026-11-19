@@ -49,7 +49,7 @@ internal object RadioStreamController {
 
     fun handle(context: Context, session: Session, command: String): String {
         if (isStopCommand(command)) { stop(); return "Ладно, радио выключено." }
-        val query = command.replace(Regex("(?i)(включи|поставь|запусти|сыграй|найди и включи|следующую станцию|радио|музыку|станцию|станция|пожалуйста)"), " ").trim()
+        val query = command.replace(Regex("(?i)(включи|поставь|запусти|сыграй|найди и включи|следующ\\w*\\s+станци\\w*|радио|музыку|станцию|станция|пожалуйста)"), " ").trim()
         val genre = when (query.lowercase()) {
             "рок" -> "rock"
             "поп", "попса" -> "pop"
