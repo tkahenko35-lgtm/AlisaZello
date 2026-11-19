@@ -121,41 +121,59 @@ internal object YandexVoiceAssistant {
         }
     }
 
+    // Queue outgoing Zello messages. Starting a second VoiceSource before the SDK
+    // has stopped the previous stream can leave the channel unable to transmit again.
+    private val replyQueue = java.util.concurrent.ConcurrentLinkedQueue<Pair<Session, ShortArray>>()
+    @Volatile private var replyQueueRunning = false
+
     fun speakInChannel(session: Session, audio: ShortArray) {
         if (audio.isEmpty()) return
-        val source = object : VoiceSource {
-            @Volatile private var activeSink: VoiceSink? = null
-            @Volatile private var stopped = false
+        replyQueue.add(session to audio.copyOf())
+        main.post { drainReplyQueue() }
+    }
 
+    private fun drainReplyQueue() {
+        if (replyQueueRunning) return
+        val item = replyQueue.poll() ?: return
+        replyQueueRunning = true
+        val (session, audio) = item
+        val source = object : VoiceSource {
+            @Volatile private var cancelled = false
             override fun startProvidingAudio(sink: VoiceSink, sampleRate: Int, stream: OutgoingVoiceStream) {
-                activeSink = sink
                 audioWorker.execute {
                     try {
                         var offset = 0
-                        while (!stopped && offset < audio.size) {
-                            val end = minOf(offset + 320, audio.size)
-                            sink.provideAudio(audio.copyOfRange(offset, end))
-                            offset = end
+                        while (!cancelled && offset < audio.size) {
+                            val next = minOf(offset + 320, audio.size)
+                            sink.provideAudio(audio.copyOfRange(offset, next))
+                            offset = next
                             Thread.sleep(20)
                         }
-                    } catch (_: Exception) {
+                    } catch (e: Exception) {
+                        Log.w("AlisaRadio", "Outgoing audio stream ended with error", e)
                     } finally {
-                        runCatching { sink.stop() }
-                        activeSink = null
+                        main.post {
+                            runCatching { stream.stop() }
+                            finishReplyQueue()
+                        }
                     }
                 }
             }
+            override fun stopProvidingAudio(sink: VoiceSink) { cancelled = true }
+        }
+        val stream = runCatching {
+            session.startVoiceMessage(OutgoingVoiceConfiguration(source, TARGET_RATE))
+        }.getOrNull()
+        if (stream == null) {
+            Log.e("AlisaRadio", "Zello rejected outgoing voice stream")
+            main.postDelayed({ finishReplyQueue() }, 1800L)
+        }
+    }
 
-            override fun stopProvidingAudio(sink: VoiceSink) {
-                stopped = true
-                activeSink = null
-            }
-        }
-        main.post {
-            runCatching {
-                session.startVoiceMessage(OutgoingVoiceConfiguration(source, TARGET_RATE))
-            }
-        }
+    private fun finishReplyQueue() {
+        if (!replyQueueRunning) return
+        replyQueueRunning = false
+        main.postDelayed({ drainReplyQueue() }, 1200L)
     }
 
     private fun recognize(apiKey: String, folderId: String, samples: ShortArray): String {
