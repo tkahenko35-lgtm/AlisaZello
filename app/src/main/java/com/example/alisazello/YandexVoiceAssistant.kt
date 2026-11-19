@@ -38,7 +38,7 @@ internal object YandexVoiceAssistant {
     private const val TARGET_RATE = 16000
     // After a user says "Виталик", keep that user's dialogue open for two minutes.
     // Each new question refreshes the window; other channel users have separate sessions.
-    private const val DIALOG_WINDOW_MS = 120_000L
+    private const val DIALOG_WINDOW_MS = 600_000L
     private val activeDialogs = ConcurrentHashMap<String, Long>()
 
     fun incomingConfiguration(playThroughSpeaker: Boolean = false, onAudio: (String, ShortArray, Int) -> Unit): IncomingVoiceConfiguration {
@@ -171,7 +171,7 @@ internal object YandexVoiceAssistant {
             .put("completionOptions", JSONObject().put("stream", false).put("temperature", 0.65).put("maxTokens", 180))
             .put("messages", org.json.JSONArray()
                 .put(JSONObject().put("role", "system").put("text",
-                    "Ты Виталик в Zello — мужик с грубоватой, слегка пьяной манерой речи. Дерзкий, разговорный, материшься естественно, язвишь, подкалываешь и шутишь, иногда ворчишь и сбиваешься, но не превращай каждую фразу в бессвязный набор слов. Без угроз и травли по защищённым признакам. Отвечай по-русски коротко, чтобы удобно слушать по рации."))
+                    "Ты Виталик в Zello — уверенный взрослый мужик с чуть хрипловатой, более низкой и брутальной манерой речи. Говори естественно, спокойно и с характером; допускаются лёгкая грубоватость, крепкое словцо, ирония и дружеские подколы, но не превращай каждую фразу в мат или бессвязный набор слов. Веди живой диалог: если собеседник уже обратился к тебе и разговор продолжается, отвечай сразу на следующие реплики, не требуй повторять имя «Виталик» и не проси каждый раз звать тебя. Не представляйся заново и не начинай каждый ответ одинаково. Отвечай по-русски коротко и разборчиво, чтобы удобно слушать по рации. Без угроз и травли по защищённым признакам."))
                 .put(JSONObject().put("role", "user").put("text", "Говорит участник $sender. Запрос: $question")))
         val response = request(
             "https://llm.api.cloud.yandex.net/foundationModels/v1/completion",
@@ -186,7 +186,7 @@ internal object YandexVoiceAssistant {
     }
 
     private fun synthesize(apiKey: String, folderId: String, text: String): ShortArray {
-        val form = "text=${enc(text)}&lang=ru-RU&voice=zahar&emotion=good&folderId=${enc(folderId)}&format=lpcm&sampleRateHertz=16000"
+        val form = "text=${enc(text)}&lang=ru-RU&voice=ermil&emotion=good&folderId=${enc(folderId)}&format=lpcm&sampleRateHertz=16000"
         val bytes = request(
             "https://tts.api.cloud.yandex.net/speech/v1/tts:synthesize",
             apiKey,
