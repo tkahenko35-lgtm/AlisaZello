@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -34,6 +35,16 @@ class MainActivity : ComponentActivity() { override fun onCreate(savedInstanceSt
     var showList by remember { mutableStateOf(false) }
     var log by remember { mutableStateOf(listOf("Готов к запуску симуляции персонажей.")) }
     val roster = remember(count) { (0 until count.coerceIn(1,1000)).map(::persona) }
+    LaunchedEffect(running) {
+        while (running) {
+            delay(4500)
+            val first = roster.random()
+            val second = roster.filter { it.id != first.id }.random()
+            val phrases = listOf("Ну что, народ, кто-нибудь сегодня что интересное видел?","Да ладно, расскажи подробнее, не томи!","Вот с этим я не согласен, у меня другое мнение.","Ха! Хорошо сказано, прямо в точку.","А давайте тему сменим, а то зациклились.","Слушай, а ведь если подумать, всё не так однозначно.","Кто за чай, кто за кофе? Я за то, чтобы разговор продолжался.","Это напоминает мне одну историю...")
+            val replies = listOf("Поддерживаю!","Не, тут спорный момент.","Ахаха, продолжай!","И что дальше?","Согласен, кстати.")
+            log = (log + "${first.nick}: ${phrases.random()}\n${second.nick}: ${replies.random()}").takeLast(100)
+        }
+    }
     MaterialTheme(colorScheme=darkColorScheme(primary=accent, background=bg, surface=panel)) {
         Scaffold(containerColor=bg, topBar={ TopAppBar(title={ Column { Text("BOT MANAGER",fontWeight=FontWeight.Bold); Text("Персонажи и сценарии",fontSize=12.sp) } }, colors=TopAppBarDefaults.topAppBarColors(containerColor=bg,titleContentColor=Color.White)) }) { pad ->
             LazyColumn(Modifier.fillMaxSize().padding(pad), contentPadding=PaddingValues(16.dp), verticalArrangement=Arrangement.spacedBy(14.dp)) {
@@ -47,7 +58,7 @@ class MainActivity : ComponentActivity() { override fun onCreate(savedInstanceSt
                     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) { listOf(50,100,500).forEach { n -> OutlinedButton(onClick={count=n}) { Text("$n") } } }
                     OutlinedTextField(topic,{topic=it},label={Text("Тема разговора")},modifier=Modifier.fillMaxWidth(),singleLine=true)
                     Button(onClick={ val next=!running; running=next; log=log+if(next) "Симуляция запущена: $count персонажей, канал «$channel», тема «$topic»." else "Сессия остановлена." },modifier=Modifier.fillMaxWidth()) { Text(if(running) "Остановить" else "Запустить группу") }
-                    Text(if(running) "Симуляция активна. Это не подключение сотен аккаунтов Zello." else "Персонажи и диалоговая симуляция; подключение массовых аккаунтов не выполняется.",fontSize=12.sp,color=Color.LightGray)
+                    Text(if(running) "Идёт автоматическая демонстрационная беседа персонажей. Это не подключение аккаунтов Zello." else "Персонажи и диалоговая симуляция; подключение массовых аккаунтов не выполняется.",fontSize=12.sp,color=Color.LightGray)
                 } } }
                 item { Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) { Button(onClick={showList=!showList},modifier=Modifier.weight(1f)) { Text(if(showList) "Скрыть персонажей" else "Список персонажей") }; OutlinedButton(onClick={log=log+ "Персонажи обновлены: $count."}) { Text("Обновить") } } }
                 if(showList) { items(roster.take(200),key={it.id}) { p -> Card(colors=CardDefaults.cardColors(containerColor=panel)) { Column(Modifier.fillMaxWidth().padding(14.dp)) { Text(p.nick,fontWeight=FontWeight.Bold); Text("Характер: ${p.style} • ${p.voice}",fontSize=12.sp,color=Color.LightGray) } } }; item { Text("Показаны первые ${minOf(count,200)} из $count. Список ограничен для удобства отображения.") } }
