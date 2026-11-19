@@ -27,7 +27,8 @@ class MainActivity : ComponentActivity() { override fun onCreate(savedInstanceSt
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable fun BotManagerApp() {
     var count by remember { mutableIntStateOf(50) }
-    var channel by remember { mutableStateOf("Умные нелюди") }\n    val channels = listOf("Умные нелюди", "Перелом", "~Мы Семья~")
+    var channel by remember { mutableStateOf("Умные нелюди") }
+    val channels = listOf("Умные нелюди", "Перелом", "~Мы Семья~")
     var topic by remember { mutableStateOf("Свободная беседа") }
     var running by remember { mutableStateOf(false) }
     var showList by remember { mutableStateOf(false) }
@@ -38,7 +39,9 @@ class MainActivity : ComponentActivity() { override fun onCreate(savedInstanceSt
             LazyColumn(Modifier.fillMaxSize().padding(pad), contentPadding=PaddingValues(16.dp), verticalArrangement=Arrangement.spacedBy(14.dp)) {
                 item { Card(colors=CardDefaults.cardColors(containerColor=panel),shape=RoundedCornerShape(22.dp)) { Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
                     Text("Сессия",fontSize=20.sp,fontWeight=FontWeight.Bold)
-                    Text("Выбрать канал",fontWeight=FontWeight.Medium)\n                    channels.forEach { ch -> OutlinedButton(onClick={channel=ch}, modifier=Modifier.fillMaxWidth()) { Text(if(channel==ch) "✓ $ch" else ch) } }\n                    OutlinedTextField(channel,{channel=it},label={Text("Или ввести канал вручную")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+                    Text("Выбрать канал",fontWeight=FontWeight.Medium)
+                    channels.forEach { ch -> OutlinedButton(onClick={channel=ch}, modifier=Modifier.fillMaxWidth()) { Text(if(channel==ch) "✓ $ch" else ch) } }
+                    OutlinedTextField(channel,{channel=it},label={Text("Или ввести канал вручную")},modifier=Modifier.fillMaxWidth(),singleLine=true)
                     Text("Количество персонажей: $count",fontWeight=FontWeight.Medium)
                     Slider(value=count.toFloat(),onValueChange={count=it.toInt().coerceIn(1,1000)},valueRange=1f..1000f)
                     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) { listOf(50,100,500).forEach { n -> OutlinedButton(onClick={count=n}) { Text("$n") } } }
