@@ -95,8 +95,7 @@ internal object YandexVoiceAssistant {
         }
     }
 
-    /** Queue replies so transmissions never overlap. A conservative gap gives the channel
-     * time to clear; the SDK does not expose a reliable channel-busy flag. */
+    /** Queue replies; start/stop stream calls are marshalled to the UI thread. */
     fun speakInChannel(session: Session, audio: ShortArray) {
         if (audio.isEmpty()) return
         replyQueue.add(session to audio.copyOf())
@@ -109,12 +108,12 @@ internal object YandexVoiceAssistant {
         replyQueueRunning = true
         val (session, audio) = item
         val source = object : VoiceSource {
-            @Volatile private var stopped = false
+            @Volatile private var cancelled = false
             override fun startProvidingAudio(sink: VoiceSink, sampleRate: Int, stream: OutgoingVoiceStream) {
                 worker.execute {
                     try {
                         var offset = 0
-                        while (!stopped && offset < audio.size) {
+                        while (!cancelled && offset < audio.size) {
                             val end = minOf(offset + 320, audio.size)
                             sink.provideAudio(audio.copyOfRange(offset, end))
                             offset = end
@@ -122,27 +121,27 @@ internal object YandexVoiceAssistant {
                         }
                     } catch (_: Exception) {
                     } finally {
-                        runCatching { sink.stop() }
+                        main.post {
+                            runCatching { stream.stop() }
+                            finishReplyQueue()
+                        }
                     }
                 }
             }
-            override fun stopProvidingAudio(sink: VoiceSink) { stopped = true }
+            override fun stopProvidingAudio(sink: VoiceSink) { cancelled = true }
         }
-        var started = false
-        repeat(3) { attempt ->
-            if (!started) {
-                started = runCatching {
-                    session.startVoiceMessage(OutgoingVoiceConfiguration(source, TARGET_RATE))
-                }.isSuccess
-                if (!started && attempt < 2) Thread.sleep(1200L * (attempt + 1))
-            }
+        val stream = runCatching {
+            session.startVoiceMessage(OutgoingVoiceConfiguration(source, TARGET_RATE))
+        }.getOrNull()
+        if (stream == null) {
+            // SDK rejected/failed to create the outgoing stream; don't pretend it started.
+            main.postDelayed({ finishReplyQueue() }, 1800L)
         }
-        // Estimate audio duration and allow additional airtime after the transmission.
-        val waitMs = (audio.size * 1000L / TARGET_RATE) + 2500L
-        main.postDelayed({
-            replyQueueRunning = false
-            drainReplyQueue()
-        }, if (started) waitMs else 2500L)
+    }
+
+    private fun finishReplyQueue() {
+        replyQueueRunning = false
+        main.postDelayed({ drainReplyQueue() }, 1200L)
     }
 
     private fun recognize(apiKey: String, folderId: String, samples: ShortArray): String {
