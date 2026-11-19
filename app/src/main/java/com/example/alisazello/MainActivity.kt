@@ -40,7 +40,8 @@ import javax.crypto.spec.GCMParameterSpec
 
 private val Background = Color(0xFF101522)
 private val Panel = Color(0xFF1B2434)
-private val Accent = Color(0xFF9B8CFF)
+private val Accent = Color(0xFFFFB547)
+private val AccentSoft = Color(0xFF3A2B1C)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -325,11 +326,11 @@ private fun AlisaApp() {
         }
     }
 
-    MaterialTheme(colorScheme = darkColorScheme(primary = Accent, background = Background, surface = Panel)) {
+    MaterialTheme(colorScheme = darkColorScheme(primary = Accent, secondary = Color(0xFFE47735), background = Background, surface = Panel)) {
         Scaffold(containerColor = Background, topBar = {
             TopAppBar(title = { Column {
-                Text("ВИТАЛИК", fontWeight = FontWeight.Bold)
-                Text("Vitalik Radio · Zello", fontSize = 12.sp, color = Color.LightGray)
+                Text("ВИТАЛИК", fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp)
+                Text("РАДИОХУЛИГАН · ZELLO", fontSize = 11.sp, color = Accent)
             } }, colors = TopAppBarDefaults.topAppBarColors(containerColor = Background, titleContentColor = Color.White))
         }) { padding ->
             LazyColumn(modifier = Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -370,7 +371,7 @@ private fun AlisaApp() {
                                             .onSuccess { tokenSaved = true }
                                             .onFailure { tokenSaved = false }
                                     }
-                                }, modifier = Modifier.weight(1f), enabled = tokenInput.isNotBlank()) { Text("Сохранить токен") }
+                                }, modifier = Modifier.weight(1f), enabled = tokenInput.isNotBlank() && !tokenSaved) { Text(if (tokenSaved) "✓ Токен сохранён" else "Подтвердить токен") }
                                 OutlinedButton(onClick = {
                                     SecureTokenStore.clear(context)
                                     tokenInput = ""
@@ -389,7 +390,7 @@ private fun AlisaApp() {
                             OutlinedTextField(value = zelloUsername, onValueChange = { zelloUsername = it; credentialsSaved = false }, modifier = Modifier.fillMaxWidth(), label = { Text("Имя пользователя Zello") }, singleLine = true)
                             OutlinedTextField(value = zelloPassword, onValueChange = { zelloPassword = it; credentialsSaved = false }, modifier = Modifier.fillMaxWidth(), label = { Text("Пароль Zello") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Button(onClick = { val user = zelloUsername.trim(); if (user.isNotEmpty() && zelloPassword.isNotEmpty()) runCatching { SecureCredentialStore.save(context, user, zelloPassword) }.onSuccess { credentialsSaved = true }.onFailure { credentialsSaved = false } }, modifier = Modifier.weight(1f), enabled = zelloUsername.isNotBlank() && zelloPassword.isNotBlank()) { Text("Сохранить вход") }
+                                Button(onClick = { val user = zelloUsername.trim(); if (user.isNotEmpty() && zelloPassword.isNotEmpty()) runCatching { SecureCredentialStore.save(context, user, zelloPassword) }.onSuccess { credentialsSaved = true }.onFailure { credentialsSaved = false } }, modifier = Modifier.weight(1f), enabled = zelloUsername.isNotBlank() && zelloPassword.isNotBlank() && !credentialsSaved) { Text(if (credentialsSaved) "✓ Вход сохранён" else "Подтвердить вход") }
                                 OutlinedButton(onClick = { SecureCredentialStore.clear(context); zelloUsername = ""; zelloPassword = ""; credentialsSaved = false; if (connectedChannel != null) disconnectZello() }) { Text("Очистить") }
                             }
                             Text("Логин и пароль шифруются на телефоне. Не присылай их в чат. После сохранения переподключи канал.", color = Color.LightGray, fontSize = 11.sp)
@@ -412,7 +413,7 @@ private fun AlisaApp() {
                                             .onSuccess { yandexSaved = true }
                                             .onFailure { yandexSaved = false }
                                     }
-                                }, modifier = Modifier.weight(1f), enabled = yandexApiKey.isNotBlank() && yandexFolderId.isNotBlank()) { Text("Сохранить Яндекс") }
+                                }, modifier = Modifier.weight(1f), enabled = yandexApiKey.isNotBlank() && yandexFolderId.isNotBlank() && !yandexSaved) { Text(if (yandexSaved) "✓ Яндекс сохранён" else "Подтвердить Яндекс") }
                                 OutlinedButton(onClick = {
                                     YandexCredentialStore.clear(context)
                                     yandexApiKey = ""
