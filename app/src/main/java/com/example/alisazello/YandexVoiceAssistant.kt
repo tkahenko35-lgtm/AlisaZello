@@ -104,10 +104,12 @@ internal object YandexVoiceAssistant {
                     onReply(phrase, synthesize(apiKey, folderId, phrase))
                     return@execute
                 }
-                val answer = if (isMusicCommand(question)) {
-                    YandexMusicController.handle(context, question)
-                } else {
-                    ask(apiKey, folderId, sender, question)
+                val answer = when {
+                    InfoCommandController.isWeatherCommand(question) ->
+                        InfoCommandController.weather(question)
+                    InfoCommandController.isNewsCommand(question) ->
+                        InfoCommandController.news(question)
+                    else -> ask(apiKey, folderId, sender, question)
                 }
                 val replyAudio = synthesize(apiKey, folderId, answer)
                 Log.d("AlisaRadio", "Reply synthesized: chars=${answer.length}, samples=${replyAudio.size}")
@@ -268,8 +270,6 @@ internal object YandexVoiceAssistant {
         }
     }
 
-    private fun isMusicCommand(text: String): Boolean =
-        Regex("(?i)(включи|поставь|запусти|сыграй|воспроизведи|найди и включи|следующ|предыдущ|дальше|назад|пауза|останови|стоп музыка|выключи музыку|продолжи|возобнови|играй дальше|громче|тише)").containsMatchIn(text)
 
     private fun enc(value: String): String = URLEncoder.encode(value, "UTF-8")
 
