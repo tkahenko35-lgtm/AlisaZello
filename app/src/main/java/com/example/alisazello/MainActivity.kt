@@ -296,7 +296,7 @@ private fun AlisaApp() {
                 val yandex = YandexCredentialStore.read(context) ?: return null
                 val playLocally = preferences.getBoolean("play_incoming_audio_in_vitalik", false)
                 return YandexVoiceAssistant.incomingConfiguration(playLocally) { sender, audio, sampleRate ->
-                    YandexVoiceAssistant.processRequest(context, yandex.first, yandex.second, sender, audio, sampleRate) { _, replyAudio ->
+                    YandexVoiceAssistant.processRequest(context, yandex.first, yandex.second, session, sender, audio, sampleRate) { _, replyAudio ->
                         if (replyAudio != null && assistantEnabled) {
                             YandexVoiceAssistant.speakInChannel(session, replyAudio)
                         }
