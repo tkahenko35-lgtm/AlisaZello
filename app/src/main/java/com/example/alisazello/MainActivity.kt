@@ -6,6 +6,7 @@ import android.os.Looper
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -287,9 +288,9 @@ private fun AlisaApp() {
                 connectionStatus = "Связь потеряна. Zello переподключается…"
                 return true
             }
-            override fun onOutgoingVoiceError(session: Session, stream: OutgoingVoiceStream, error: OutgoingVoiceStreamError) {}
-            override fun onOutgoingVoiceStateChanged(session: Session, stream: OutgoingVoiceStream) {}
-            override fun onOutgoingVoiceProgress(session: Session, stream: OutgoingVoiceStream, positionMs: Int) {}
+            override fun onOutgoingVoiceError(session: Session, stream: OutgoingVoiceStream, error: OutgoingVoiceStreamError) { Log.e("AlisaRadio", "Zello outgoing voice error: $error") }
+            override fun onOutgoingVoiceStateChanged(session: Session, stream: OutgoingVoiceStream) { Log.d("AlisaRadio", "Outgoing voice state changed") }
+            override fun onOutgoingVoiceProgress(session: Session, stream: OutgoingVoiceStream, positionMs: Int) { if (positionMs % 5000 < 100) Log.d("AlisaRadio", "Outgoing voice progress: " + positionMs + "ms") }
             override fun onIncomingVoiceWillStart(session: Session, streamInfo: IncomingVoiceStreamInfo): IncomingVoiceConfiguration? {
                 if (!assistantEnabled) return null
                 val yandex = YandexCredentialStore.read(context) ?: return null
@@ -302,9 +303,9 @@ private fun AlisaApp() {
                     }
                 }
             }
-            override fun onIncomingVoiceStarted(session: Session, stream: IncomingVoiceStream) {}
-            override fun onIncomingVoiceStopped(session: Session, stream: IncomingVoiceStream) {}
-            override fun onIncomingVoiceProgress(session: Session, stream: IncomingVoiceStream, positionMs: Int) {}
+            override fun onIncomingVoiceStarted(session: Session, stream: IncomingVoiceStream) { Log.d("AlisaRadio", "Incoming voice started: " + stream.sender) }
+            override fun onIncomingVoiceStopped(session: Session, stream: IncomingVoiceStream) { Log.d("AlisaRadio", "Incoming voice stopped: " + stream.sender) }
+            override fun onIncomingVoiceProgress(session: Session, stream: IncomingVoiceStream, positionMs: Int) { if (positionMs % 5000 < 100) Log.d("AlisaRadio", "Incoming voice progress: " + positionMs + "ms") }
             override fun onTextMessage(session: Session, sender: String, message: String) {}
             override fun onImageMessage(session: Session, imageInfo: ImageInfo) {}
             override fun onLocationMessage(session: Session, sender: String, location: Location) {}
@@ -436,7 +437,7 @@ private fun AlisaApp() {
                                     yandexSaved = false
                                 }) { Text("Очистить") }
                             }
-                            Text("Ключ вводится только в приложение, не присылай его в чат. Сохранение защищено Android Keystore. Интеграция сервисов Яндекса будет следующим этапом.", color = Color.LightGray, fontSize = 11.sp)
+                            Text("Ключ вводится только в приложение, не присылай его в чат. Сохранение защищено Android Keystore. Эти данные используются для распознавания речи, генерации ответов и озвучивания Виталика.", color = Color.LightGray, fontSize = 11.sp)
                         }
                     }
                 }
