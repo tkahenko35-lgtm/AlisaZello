@@ -76,8 +76,8 @@ internal object YandexVoiceAssistant {
             try {
                 val normalized = resample(pcm, sampleRate, TARGET_RATE)
                 val recognized = recognize(apiKey, folderId, normalized)
-                if (recognized.isBlank() || !recognized.contains(Regex("алис[аы]", RegexOption.IGNORE_CASE))) return@execute
-                val question = recognized.replace(Regex("(?i)алис[аы][,!. ]*"), "").trim()
+                if (recognized.isBlank() || !recognized.contains(Regex("виталик", RegexOption.IGNORE_CASE))) return@execute
+                val question = recognized.replace(Regex("(?i)виталик[,!. ]*"), "").trim()
                 if (question.isBlank()) {
                     val phrase = "Я здесь. Говори, не стесняйся."
                     onReply(phrase, synthesize(apiKey, folderId, phrase))
