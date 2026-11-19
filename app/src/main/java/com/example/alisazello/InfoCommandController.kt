@@ -37,7 +37,7 @@ internal object InfoCommandController {
         val wind = current.optDouble("wind_speed_10m")
         val rain = current.optDouble("precipitation")
         val code = current.optInt("weather_code")
-        return "Погода в " + name + if (country.isNotBlank()) ", " + country else "" +
+        return "Погода в " + name + (if (country.isNotBlank()) ", " + country else "") +
             ": " + temp.toInt() + " градусов, ощущается как " + feels.toInt() + ". " + weatherText(code) +
             ". Влажность " + humidity + " процентов, ветер " + wind.toInt() + " километров в час, осадки " + rain + " миллиметров."
     }
