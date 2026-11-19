@@ -185,7 +185,7 @@ private fun AlisaApp() {
     val channels = remember(context) {
         mutableStateListOf<String>().apply {
             val saved = preferences.getStringSet("channels", null)
-            addAll(saved ?: setOf("Умные нелюди"))
+            addAll(saved ?: setOf("~Мы Семья~", "Перелом"))
         }
     }
     LaunchedEffect(channels.toList()) {
