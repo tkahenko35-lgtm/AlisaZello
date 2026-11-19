@@ -35,7 +35,7 @@ internal object YandexVoiceAssistant {
     private val audioWorker = Executors.newCachedThreadPool()
     private val main = Handler(Looper.getMainLooper())
     private const val TARGET_RATE = 16000
-    // After a user says "Алиса", keep that user's dialogue open for two minutes.
+    // After a user says "Виталик", keep that user's dialogue open for two minutes.
     // Each new question refreshes the window; other channel users have separate sessions.
     private const val DIALOG_WINDOW_MS = 120_000L
     private val activeDialogs = ConcurrentHashMap<String, Long>()
@@ -86,16 +86,16 @@ internal object YandexVoiceAssistant {
                 val normalized = resample(pcm, sampleRate, TARGET_RATE)
                 val recognized = recognize(apiKey, folderId, normalized)
                 val cleanText = recognized.trim()
-                val hasWakeWord = cleanText.contains(Regex("алис[аы]", RegexOption.IGNORE_CASE))
+                val hasWakeWord = cleanText.contains(Regex("виталик", RegexOption.IGNORE_CASE))
                 val now = System.currentTimeMillis()
                 val dialogActive = (activeDialogs[sender] ?: 0L) > now
                 Log.d("AlisaRadio", "Speech recognized: chars=${cleanText.length}, wakeWord=$hasWakeWord, dialogActive=$dialogActive")
                 if (cleanText.isBlank() || (!hasWakeWord && !dialogActive)) return@execute
 
                 // Wake word starts a dialogue; follow-up questions from the same
-                // participant are accepted without repeating "Алиса".
+                // participant are accepted without repeating "Виталик".
                 activeDialogs[sender] = now + DIALOG_WINDOW_MS
-                val question = cleanText.replace(Regex("(?i)алис[аы][,!. ]*"), "").trim()
+                val question = cleanText.replace(Regex("(?i)виталик[,!. ]*"), "").trim()
                 if (question.isBlank()) {
                     val phrase = "Я здесь. Говори, не стесняйся."
                     onReply(phrase, synthesize(apiKey, folderId, phrase))
@@ -111,7 +111,7 @@ internal object YandexVoiceAssistant {
                 onReply(answer, replyAudio)
             } catch (e: Exception) {
                 Log.e("AlisaRadio", "Request processing failed", e)
-                val message = "Не смогла обработать запрос: ${safeError(e)}"
+                val message = "Не смог обработать запрос: ${safeError(e)}"
                 val fallbackAudio = runCatching { synthesize(apiKey, folderId, message) }.getOrNull()
                 onReply(message, fallbackAudio)
             }
@@ -170,7 +170,7 @@ internal object YandexVoiceAssistant {
             .put("completionOptions", JSONObject().put("stream", false).put("temperature", 0.65).put("maxTokens", 180))
             .put("messages", org.json.JSONArray()
                 .put(JSONObject().put("role", "system").put("text",
-                    "Ты Алиса в Zello, образ Радио Хулиганка: дерзкая, остроумная, разговорная, можешь использовать умеренный мат и подколы без угроз и травли. Отвечай по-русски коротко, чтобы ответ удобно было слушать по рации."))
+                    "Ты Виталик в Zello, образ Радио Хулиганка: дерзкая, остроумная, разговорная, можешь использовать умеренный мат и подколы без угроз и травли. Отвечай по-русски коротко, чтобы ответ удобно было слушать по рации."))
                 .put(JSONObject().put("role", "user").put("text", "Говорит участник $sender. Запрос: $question")))
         val response = request(
             "https://llm.api.cloud.yandex.net/foundationModels/v1/completion",
@@ -181,7 +181,7 @@ internal object YandexVoiceAssistant {
         val json = JSONObject(String(response, StandardCharsets.UTF_8))
         val alternatives = json.optJSONObject("result")?.optJSONArray("alternatives")
         val text = alternatives?.optJSONObject(0)?.optJSONObject("message")?.optString("text").orEmpty()
-        return text.ifBlank { "Что-то я зависла. Повтори вопрос." }.take(900)
+        return text.ifBlank { "Чё-то я завис. Повтори вопрос." }.take(900)
     }
 
     private fun synthesize(apiKey: String, folderId: String, text: String): ShortArray {
