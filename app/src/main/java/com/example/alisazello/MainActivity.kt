@@ -36,13 +36,14 @@ class MainActivity : ComponentActivity() { override fun onCreate(savedInstanceSt
     var log by remember { mutableStateOf(listOf("Готов к запуску симуляции персонажей.")) }
     val roster = remember(count) { (0 until count.coerceIn(1,1000)).map(::persona) }
     LaunchedEffect(running) {
+        val phrases = listOf("Ну что, народ, кто-нибудь сегодня что интересное видел?","Да ладно, расскажи подробнее, не томи!","Вот с этим я не согласен, у меня другое мнение.","Ха! Хорошо сказано, прямо в точку.","А давайте тему сменим, а то зациклились.","Слушай, а ведь если подумать, всё не так однозначно.","Кто за чай, кто за кофе? Я за то, чтобы разговор продолжался.","Это напоминает мне одну историю...")
+        val replies = listOf("Поддерживаю!","Не, тут спорный момент.","Ахаха, продолжай!","И что дальше?","Согласен, кстати.")
         while (running) {
-            delay(4500)
+            delay((650L..1800L).random())
             val first = roster.random()
             val second = roster.filter { it.id != first.id }.random()
-            val phrases = listOf("Ну что, народ, кто-нибудь сегодня что интересное видел?","Да ладно, расскажи подробнее, не томи!","Вот с этим я не согласен, у меня другое мнение.","Ха! Хорошо сказано, прямо в точку.","А давайте тему сменим, а то зациклились.","Слушай, а ведь если подумать, всё не так однозначно.","Кто за чай, кто за кофе? Я за то, чтобы разговор продолжался.","Это напоминает мне одну историю...")
-            val replies = listOf("Поддерживаю!","Не, тут спорный момент.","Ахаха, продолжай!","И что дальше?","Согласен, кстати.")
-            log = (log + "${first.nick}: ${phrases.random()}\n${second.nick}: ${replies.random()}").takeLast(100)
+            val line = "${first.nick}: ${phrases.random()}\n${second.nick}: ${replies.random()}"
+            log = (log + line).takeLast(100)
         }
     }
     MaterialTheme(colorScheme=darkColorScheme(primary=accent, background=bg, surface=panel)) {
