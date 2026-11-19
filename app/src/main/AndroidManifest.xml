@@ -12,7 +12,8 @@
 
     <application
         android:allowBackup="false"
-        android:label="Виталик"\n        android:icon="@drawable/vitalik_icon"
+        android:label="Виталик"
+        android:icon="@drawable/vitalik_icon"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
