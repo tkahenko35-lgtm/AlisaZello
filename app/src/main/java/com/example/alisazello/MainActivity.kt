@@ -325,8 +325,8 @@ private fun AlisaApp() {
     MaterialTheme(colorScheme = darkColorScheme(primary = Accent, background = Background, surface = Panel)) {
         Scaffold(containerColor = Background, topBar = {
             TopAppBar(title = { Column {
-                Text("АЛИСА", fontWeight = FontWeight.Bold)
-                Text("Alisa Radio · Zello", fontSize = 12.sp, color = Color.LightGray)
+                Text("ВИТАЛИК", fontWeight = FontWeight.Bold)
+                Text("Vitalik Radio · Zello", fontSize = 12.sp, color = Color.LightGray)
             } }, colors = TopAppBarDefaults.topAppBarColors(containerColor = Background, titleContentColor = Color.White))
         }) { padding ->
             LazyColumn(modifier = Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -337,7 +337,7 @@ private fun AlisaApp() {
                                 Icon(if (assistantEnabled) Icons.Default.Mic else Icons.Default.MicOff, contentDescription = null, tint = Accent, modifier = Modifier.size(42.dp))
                             }
                             Spacer(Modifier.height(14.dp))
-                            Text(if (assistantEnabled) "Алиса включена" else "Алиса выключена", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                            Text(if (assistantEnabled) "Виталик включён" else "Виталик выключен", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                             Spacer(Modifier.height(6.dp))
                             Text(connectionStatus, color = Color.LightGray, fontSize = 13.sp)
                             Spacer(Modifier.height(18.dp))
@@ -449,7 +449,7 @@ private fun AlisaApp() {
                         Icon(Icons.Default.Add, contentDescription = null); Spacer(Modifier.width(8.dp)); Text("Добавить канал")
                     }
                 }
-                item { Text("Подключение без логина и пароля Zello работает только на прослушивание. Для передачи голоса и музыки потребуется авторизация аккаунта. Алиса и музыкальный поток ещё разрабатываются.", color = Color.LightGray, fontSize = 12.sp) }
+                item { Text("Подключение без логина и пароля Zello работает только на прослушивание. Для передачи голоса и музыки потребуется авторизация аккаунта. Виталик и музыкальный поток ещё разрабатываются.", color = Color.LightGray, fontSize = 12.sp) }
             }
         }
     }
