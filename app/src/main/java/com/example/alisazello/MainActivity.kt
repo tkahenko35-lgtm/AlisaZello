@@ -288,7 +288,7 @@ private fun AlisaApp() {
                 connectionStatus = "Связь потеряна. Zello переподключается…"
                 return true
             }
-            override fun onOutgoingVoiceError(session: Session, stream: OutgoingVoiceStream, error: OutgoingVoiceStreamError) { Log.e("AlisaRadio", "Zello outgoing voice error: $error") }
+            override fun onOutgoingVoiceError(session: Session, stream: OutgoingVoiceStream, error: OutgoingVoiceStreamError) { Log.e("AlisaRadio", "Zello outgoing voice error: $error"); YandexVoiceAssistant.notifyOutgoingError() }
             override fun onOutgoingVoiceStateChanged(session: Session, stream: OutgoingVoiceStream) { Log.d("AlisaRadio", "Outgoing voice state changed") }
             override fun onOutgoingVoiceProgress(session: Session, stream: OutgoingVoiceStream, positionMs: Int) { if (positionMs % 5000 < 100) Log.d("AlisaRadio", "Outgoing voice progress: " + positionMs + "ms") }
             override fun onIncomingVoiceWillStart(session: Session, streamInfo: IncomingVoiceStreamInfo): IncomingVoiceConfiguration? {
