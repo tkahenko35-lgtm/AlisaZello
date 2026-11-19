@@ -32,7 +32,8 @@ internal object YandexVoiceAssistant {
     // Network requests and outgoing audio must not share one worker: a long Zello
     // voice transmission must never block recognition of the next channel request.
     private val requestWorker = Executors.newSingleThreadExecutor()
-    private val audioWorker = Executors.newCachedThreadPool()
+    // Serialize outgoing voice streams to avoid overlapping VoiceSource transmissions.
+    private val audioWorker = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
     private const val TARGET_RATE = 16000
     // After a user says "Виталик", keep that user's dialogue open for two minutes.
