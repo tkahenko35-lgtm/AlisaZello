@@ -32,6 +32,7 @@ internal object YandexVoiceAssistant {
     private const val TARGET_RATE = 16000
     private val replyQueue = java.util.concurrent.ConcurrentLinkedQueue<Pair<Session, ShortArray>>()
     @Volatile private var replyQueueRunning = false
+    @Volatile private var dialogueActive = false
 
     fun incomingConfiguration(onAudio: (String, ShortArray, Int) -> Unit): IncomingVoiceConfiguration {
         val receiver = object : VoiceReceiver {
@@ -76,8 +77,17 @@ internal object YandexVoiceAssistant {
             try {
                 val normalized = resample(pcm, sampleRate, TARGET_RATE)
                 val recognized = recognize(apiKey, folderId, normalized)
-                if (recognized.isBlank() || !recognized.contains(Regex("виталик", RegexOption.IGNORE_CASE))) return@execute
-                val question = recognized.replace(Regex("(?i)виталик[,!. ]*"), "").trim()
+                if (recognized.isBlank()) return@execute
+                val wakeWord = Regex("(?i)\\bвиталик\\b")
+                if (wakeWord.containsMatchIn(recognized)) dialogueActive = true
+                if (!dialogueActive) return@execute
+                val question = recognized.replace(wakeWord, "").trim()
+                if (Regex("(?i)(стоп|отбой|пока|заканчивай)").containsMatchIn(question)) {
+                    dialogueActive = false
+                    val phrase = "Ладно, отбой. Зови, когда опять понадоблюсь."
+                    onReply(phrase, synthesize(apiKey, folderId, phrase))
+                    return@execute
+                }
                 if (question.isBlank()) {
                     val phrase = "Я здесь. Говори, не стесняйся."
                     onReply(phrase, synthesize(apiKey, folderId, phrase))
@@ -159,7 +169,7 @@ internal object YandexVoiceAssistant {
             .put("completionOptions", JSONObject().put("stream", false).put("temperature", 0.65).put("maxTokens", 180))
             .put("messages", org.json.JSONArray()
                 .put(JSONObject().put("role", "system").put("text",
-                    "Ты Алиса в Zello, образ Радио Хулиганка: дерзкая, остроумная, разговорная, можешь использовать умеренный мат и подколы без угроз и травли. Отвечай по-русски коротко, чтобы ответ удобно было слушать по рации."))
+                    "Ты Виталик в Zello, грубоватый, хриплый, слегка пьяный мужик: разговорный, материшься естественно, язвишь, шутишь грязновато и подкалываешь, но без угроз и травли по защищённым признакам. Отвечай по-русски коротко, живо и по делу, чтобы было удобно слушать по рации. Не требуй повторять имя в каждом сообщении; продолжай диалог, пока пользователь не скажет стоп, отбой, пока или заканчивай."))
                 .put(JSONObject().put("role", "user").put("text", "Говорит участник $sender. Запрос: $question")))
         val response = request(
             "https://llm.api.cloud.yandex.net/foundationModels/v1/completion",
