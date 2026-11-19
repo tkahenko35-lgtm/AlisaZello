@@ -80,13 +80,26 @@ jobs:
           echo "KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
           echo "KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
 
-      - name: Build signed release APK
+      - name: Build release APK
         run: gradle --no-daemon assembleRelease
+      - name: Sign and verify release APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK_DIR="app/build/outputs/apk/release"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" sign \
+            --ks "$KEYSTORE_FILE" \
+            --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass env:KEYSTORE_PASSWORD \
+            --key-pass env:KEY_PASSWORD \
+            --out "$APK_DIR/BotManager-release.apk" \
+            "$APK_DIR/app-release-unsigned.apk"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$APK_DIR/BotManager-release.apk"
       - name: Upload signed release APK
         uses: actions/upload-artifact@v4
         with:
-          name: AlisaRadio-release-apk
-          path: app/build/outputs/apk/release/*.apk
+          name: BotManager-installable-apk
+          path: app/build/outputs/apk/release/BotManager-release.apk
           if-no-files-found: error
 
 # Bot Manager channel presets update
