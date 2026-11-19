@@ -78,6 +78,7 @@ internal object YandexVoiceAssistant {
         context: Context,
         apiKey: String,
         folderId: String,
+        session: Session,
         sender: String,
         pcm: ShortArray,
         sampleRate: Int,
@@ -105,10 +106,9 @@ internal object YandexVoiceAssistant {
                     return@execute
                 }
                 val answer = when {
-                    InfoCommandController.isWeatherCommand(question) ->
-                        InfoCommandController.weather(question)
-                    InfoCommandController.isNewsCommand(question) ->
-                        InfoCommandController.news(question)
+                    InfoCommandController.isWeatherCommand(question) -> InfoCommandController.weather(question)
+                    InfoCommandController.isNewsCommand(question) -> InfoCommandController.news(question)
+                    RadioStreamController.isRadioCommand(question) -> RadioStreamController.handle(context, session, question)
                     else -> ask(apiKey, folderId, sender, question)
                 }
                 val replyAudio = synthesize(apiKey, folderId, answer)
