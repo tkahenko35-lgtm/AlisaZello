@@ -41,7 +41,7 @@ internal object YandexVoiceAssistant {
     private const val DIALOG_WINDOW_MS = 120_000L
     private val activeDialogs = ConcurrentHashMap<String, Long>()
 
-    fun incomingConfiguration(onAudio: (String, ShortArray, Int) -> Unit): IncomingVoiceConfiguration {
+    fun incomingConfiguration(playThroughSpeaker: Boolean = false, onAudio: (String, ShortArray, Int) -> Unit): IncomingVoiceConfiguration {
         val receiver = object : VoiceReceiver {
             private val buffer = ByteArrayOutputStream()
             @Volatile private var senderName = "участник"
@@ -69,7 +69,7 @@ internal object YandexVoiceAssistant {
                 onAudio(senderName, samples, rate)
             }
         }
-        return IncomingVoiceConfiguration(receiver, true)
+        return IncomingVoiceConfiguration(receiver, playThroughSpeaker)
     }
 
     fun processRequest(
