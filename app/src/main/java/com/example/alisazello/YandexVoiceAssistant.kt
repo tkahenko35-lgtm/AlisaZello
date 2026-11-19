@@ -127,6 +127,7 @@ internal object YandexVoiceAssistant {
     // has stopped the previous stream can leave the channel unable to transmit again.
     private val replyQueue = java.util.concurrent.ConcurrentLinkedQueue<Pair<Session, ShortArray>>()
     @Volatile private var replyQueueRunning = false
+    private var replyQueueGeneration = 0L
 
     fun speakInChannel(session: Session, audio: ShortArray) {
         if (audio.isEmpty()) return
@@ -138,6 +139,7 @@ internal object YandexVoiceAssistant {
         if (replyQueueRunning) return
         val item = replyQueue.poll() ?: return
         replyQueueRunning = true
+        val generation = ++replyQueueGeneration
         val (session, audio) = item
         val source = object : VoiceSource {
             @Volatile private var cancelled = false
@@ -156,7 +158,7 @@ internal object YandexVoiceAssistant {
                     } finally {
                         main.post {
                             runCatching { stream.stop() }
-                            finishReplyQueue()
+                            finishReplyQueue(generation)
                         }
                     }
                 }
@@ -168,14 +170,27 @@ internal object YandexVoiceAssistant {
         }.getOrNull()
         if (stream == null) {
             Log.e("AlisaRadio", "Zello rejected outgoing voice stream")
-            main.postDelayed({ finishReplyQueue() }, 1800L)
+            main.postDelayed({ finishReplyQueue(generation) }, 1800L)
+        }
+        else {
+            main.postDelayed({
+                if (replyQueueRunning && generation == replyQueueGeneration) {
+                    Log.w("AlisaRadio", "Outgoing voice stream timed out; releasing reply queue")
+                    runCatching { stream.stop() }
+                    finishReplyQueue(generation)
+                }
+            }, 90000L)
         }
     }
 
-    private fun finishReplyQueue() {
-        if (!replyQueueRunning) return
+    private fun finishReplyQueue(generation: Long) {
+        if (!replyQueueRunning || generation != replyQueueGeneration) return
         replyQueueRunning = false
         main.postDelayed({ drainReplyQueue() }, 1200L)
+    }
+
+    fun notifyOutgoingError() {
+        main.post { if (replyQueueRunning) finishReplyQueue(replyQueueGeneration) }
     }
 
     private fun recognize(apiKey: String, folderId: String, samples: ShortArray): String {
