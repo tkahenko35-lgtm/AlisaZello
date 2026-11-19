@@ -88,3 +88,5 @@ jobs:
           name: AlisaRadio-release-apk
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
+
+# Bot Manager channel presets update
