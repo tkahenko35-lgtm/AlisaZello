@@ -7,6 +7,7 @@ import android.util.Log
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.audio.AudioProcessor
+import androidx.media3.common.audio.BaseAudioProcessor
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
@@ -145,27 +146,22 @@ internal object RadioStreamController {
         }
     }
 
-    private class RadioPcmProcessor(private val onPcm: (ByteArray, Int, Int) -> Unit) : AudioProcessor {
+    private class RadioPcmProcessor(private val onPcm: (ByteArray, Int, Int) -> Unit) : BaseAudioProcessor() {
         private var format = AudioProcessor.AudioFormat.NOT_SET
-        private var output = AudioProcessor.EMPTY_BUFFER
-        override fun configure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
+        override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
             if (inputAudioFormat.encoding != C.ENCODING_PCM_16BIT) throw AudioProcessor.UnhandledAudioFormatException(inputAudioFormat)
             format = inputAudioFormat
             return inputAudioFormat
         }
-        override fun isActive(): Boolean = format != AudioProcessor.AudioFormat.NOT_SET
-        override fun queueInput(inputBuffer: ByteBuffer) {
+        override fun onQueueInput(inputBuffer: ByteBuffer) {
             val count = inputBuffer.remaining()
             val copy = ByteArray(count)
             inputBuffer.get(copy)
             onPcm(copy, format.sampleRate, format.channelCount)
-            output = ByteBuffer.allocateDirect(count).order(ByteOrder.nativeOrder()).put(copy).flip() as ByteBuffer
+            replaceOutputBuffer(count).put(copy)
         }
-        override fun getOutput(): ByteBuffer { val result = output; output = AudioProcessor.EMPTY_BUFFER; return result }
-        override fun queueEndOfStream() { output = AudioProcessor.EMPTY_BUFFER }
-        override fun isEnded(): Boolean = output === AudioProcessor.EMPTY_BUFFER || !output.hasRemaining()
-        override fun flush() { output = AudioProcessor.EMPTY_BUFFER }
-        override fun reset() { format = AudioProcessor.AudioFormat.NOT_SET; output = AudioProcessor.EMPTY_BUFFER }
+        override fun onFlush() { }
+        override fun onReset() { format = AudioProcessor.AudioFormat.NOT_SET }
     }
 
     private fun get(url: String): ByteArray {
