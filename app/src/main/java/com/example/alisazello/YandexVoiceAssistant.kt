@@ -40,6 +40,8 @@ internal object YandexVoiceAssistant {
     // Each new question refreshes the window; other channel users have separate sessions.
     private const val DIALOG_WINDOW_MS = 600_000L
     private val activeDialogs = ConcurrentHashMap<String, Long>()
+    // Short per-speaker conversation memory so Vitalik can refer to earlier turns.
+    private val dialogHistory = ConcurrentHashMap<String, MutableList<Pair<String, String>>>()
 
     fun incomingConfiguration(playThroughSpeaker: Boolean = false, onAudio: (String, ShortArray, Int) -> Unit): IncomingVoiceConfiguration {
         val receiver = object : VoiceReceiver {
@@ -166,13 +168,21 @@ internal object YandexVoiceAssistant {
     }
 
     private fun ask(apiKey: String, folderId: String, sender: String, question: String): String {
+        val history = dialogHistory.getOrPut(sender) { mutableListOf() }
+        val messages = org.json.JSONArray()
+            .put(JSONObject().put("role", "system").put("text",
+                "Ты Виталик — развязный, расхлябанный радиохулиган, будто слегка навеселе: мужицкая хрипотца, наглая уверенность, дворовый юмор, крепкий русский мат, едкий сарказм и меткие подколы. Не стесняйся материться к месту, можешь дружески обозвать собеседника, поспорить, огрызнуться и жёстко пошутить. Не скатывайся в однообразный поток ругани: придумывай свежие шутки и отвечай по существу. Важная фишка: если сам выдал удачную шутку, можешь довольно расхохотаться прямо после неё — например «Ха-ха-ха!», «АХА! Ну я выдал!» или «Гы-гы-гы!». Смейся естественно и иногда, а не после каждой фразы; иногда можешь сначала фыркнуть или хохотнуть, а потом продолжить мысль. Поддерживай настоящую беседу: помни предыдущие реплики, учитывай контекст, задавай встречные вопросы, подхватывай темы и не отвечай как справочник. После первого обращения не требуй повторять имя «Виталик». Не представляйся заново и не начинай каждый ответ одинаково. Для рации говори короткими, ясными фразами. Не угрожай и не унижай людей по признакам их принадлежности к защищённым группам."))
+        synchronized(history) {
+            history.takeLast(12).forEach { (userText, assistantText) ->
+                messages.put(JSONObject().put("role", "user").put("text", userText))
+                messages.put(JSONObject().put("role", "assistant").put("text", assistantText))
+            }
+            messages.put(JSONObject().put("role", "user").put("text", "Говорит участник $sender. Запрос: $question"))
+        }
         val body = JSONObject()
             .put("modelUri", "gpt://$folderId/yandexgpt/latest")
-            .put("completionOptions", JSONObject().put("stream", false).put("temperature", 0.65).put("maxTokens", 180))
-            .put("messages", org.json.JSONArray()
-                .put(JSONObject().put("role", "system").put("text",
-                    "Ты Виталик в Zello — уверенный взрослый мужик с чуть хрипловатой, более низкой и брутальной манерой речи. Говори естественно, спокойно и с характером; допускаются лёгкая грубоватость, крепкое словцо, ирония и дружеские подколы, но не превращай каждую фразу в мат или бессвязный набор слов. Веди живой диалог: если собеседник уже обратился к тебе и разговор продолжается, отвечай сразу на следующие реплики, не требуй повторять имя «Виталик» и не проси каждый раз звать тебя. Не представляйся заново и не начинай каждый ответ одинаково. Отвечай по-русски коротко и разборчиво, чтобы удобно слушать по рации. Без угроз и травли по защищённым признакам."))
-                .put(JSONObject().put("role", "user").put("text", "Говорит участник $sender. Запрос: $question")))
+            .put("completionOptions", JSONObject().put("stream", false).put("temperature", 0.85).put("maxTokens", 220))
+            .put("messages", messages)
         val response = request(
             "https://llm.api.cloud.yandex.net/foundationModels/v1/completion",
             apiKey,
@@ -181,8 +191,13 @@ internal object YandexVoiceAssistant {
         )
         val json = JSONObject(String(response, StandardCharsets.UTF_8))
         val alternatives = json.optJSONObject("result")?.optJSONArray("alternatives")
-        val text = alternatives?.optJSONObject(0)?.optJSONObject("message")?.optString("text").orEmpty()
-        return text.ifBlank { "Чё-то я завис. Повтори вопрос." }.take(900)
+        val answer = alternatives?.optJSONObject(0)?.optJSONObject("message")?.optString("text").orEmpty()
+            .ifBlank { "Чё-то я завис. Повтори вопрос." }.take(900)
+        synchronized(history) {
+            history.add(question to answer)
+            while (history.size > 12) history.removeAt(0)
+        }
+        return answer
     }
 
     private fun synthesize(apiKey: String, folderId: String, text: String): ShortArray {
