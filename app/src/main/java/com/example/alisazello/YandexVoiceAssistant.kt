@@ -174,7 +174,7 @@ internal object YandexVoiceAssistant {
     }
 
     private fun synthesize(apiKey: String, folderId: String, text: String): ShortArray {
-        val form = "text=${enc(text)}&lang=ru-RU&voice=alena&folderId=${enc(folderId)}&format=lpcm&sampleRateHertz=16000"
+        val form = "text=${enc(text)}&lang=ru-RU&voice=ermil&folderId=${enc(folderId)}&format=lpcm&sampleRateHertz=16000"
         val bytes = request(
             "https://tts.api.cloud.yandex.net/speech/v1/tts:synthesize",
             apiKey,
