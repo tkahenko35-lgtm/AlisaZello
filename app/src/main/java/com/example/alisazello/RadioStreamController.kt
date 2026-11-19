@@ -48,7 +48,18 @@ internal object RadioStreamController {
     fun handle(context: Context, session: Session, command: String): String {
         if (isStopCommand(command)) { stop(); return "Ладно, радио выключено." }
         val query = command.replace(Regex("(?i)(включи|поставь|запусти|сыграй|найди и включи|следующую станцию|радио|музыку|станцию|станция|пожалуйста)"), " ").trim()
-        val params = if (query.isBlank()) "countrycode=RU" else "tag=" + enc(query)
+        val genre = when (query.lowercase()) {
+            "рок" -> "rock"
+            "поп", "попса" -> "pop"
+            "джаз" -> "jazz"
+            "классика", "классическая" -> "classical"
+            "шансон" -> "chanson"
+            "электронная", "электроника" -> "electronic"
+            "танцевальная" -> "dance"
+            "новости", "информационное" -> "news"
+            else -> ""
+        }
+        val params = if (query.isBlank()) "countrycode=RU" else if (genre.isNotBlank()) "tag=" + enc(genre) else "name=" + enc(query)
         val endpoint = "https://de1.api.radio-browser.info/json/stations/search?" + params + "&hidebroken=true&order=clickcount&reverse=true&limit=30"
         val stations = JSONArray(String(get(endpoint), Charsets.UTF_8))
         if (stations.length() == 0) return "Не нашёл подходящую радиостанцию. Назови жанр или станцию."
