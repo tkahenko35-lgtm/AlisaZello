@@ -95,11 +95,10 @@ internal object RadioStreamController {
         running = true
         val processor = RadioPcmProcessor { bytes, sampleRate, channels -> enqueuePcm(bytes, sampleRate, channels) }
         val renderers = object : DefaultRenderersFactory(context) {
-            override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean, enableOffload: Boolean): AudioSink? {
+            override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): AudioSink? {
                 return DefaultAudioSink.Builder(context)
                     .setEnableFloatOutput(false)
                     .setEnableAudioTrackPlaybackParams(false)
-                    .setOffloadMode(DefaultAudioSink.OFFLOAD_MODE_DISABLED)
                     .setAudioProcessors(arrayOf(processor))
                     .build()
             }
@@ -165,7 +164,7 @@ internal object RadioStreamController {
             format = inputAudioFormat
             return inputAudioFormat
         }
-        override fun onQueueInput(inputBuffer: ByteBuffer) {
+        override fun queueInput(inputBuffer: ByteBuffer) {
             val count = inputBuffer.remaining()
             val copy = ByteArray(count)
             inputBuffer.get(copy)
