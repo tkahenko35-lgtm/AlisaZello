@@ -167,6 +167,7 @@ private fun AlisaApp() {
     val context = LocalContext.current
     val preferences = remember(context) { context.getSharedPreferences("alisa_radio", 0) }
     var assistantEnabled by remember { mutableStateOf(false) }
+    var playIncomingAudioInVitalik by remember { mutableStateOf(preferences.getBoolean("play_incoming_audio_in_vitalik", false)) }
     var newChannel by remember { mutableStateOf("") }
     var tokenInput by remember { mutableStateOf(SecureTokenStore.read(context)) }
     var tokenSaved by remember { mutableStateOf(tokenInput.isNotBlank()) }
@@ -292,7 +293,8 @@ private fun AlisaApp() {
             override fun onIncomingVoiceWillStart(session: Session, streamInfo: IncomingVoiceStreamInfo): IncomingVoiceConfiguration? {
                 if (!assistantEnabled) return null
                 val yandex = YandexCredentialStore.read(context) ?: return null
-                return YandexVoiceAssistant.incomingConfiguration { sender, audio, sampleRate ->
+                val playLocally = preferences.getBoolean("play_incoming_audio_in_vitalik", false)
+                return YandexVoiceAssistant.incomingConfiguration(playLocally) { sender, audio, sampleRate ->
                     YandexVoiceAssistant.processRequest(context, yandex.first, yandex.second, sender, audio, sampleRate) { _, replyAudio ->
                         if (replyAudio != null && assistantEnabled) {
                             YandexVoiceAssistant.speakInChannel(session, replyAudio)
@@ -346,6 +348,19 @@ private fun AlisaApp() {
                             Text(connectionStatus, color = Color.LightGray, fontSize = 13.sp)
                             Spacer(Modifier.height(18.dp))
                             Button(onClick = { assistantEnabled = !assistantEnabled }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) { Text(if (assistantEnabled) "Выключить" else "Включить") }
+                            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("Воспроизводить входящий звук в Виталике", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                    Text("Выключено по умолчанию: звук слышен только через обычный Zello. Распознавание команд остаётся включённым.", color = Color.LightGray, fontSize = 11.sp)
+                                }
+                                Switch(
+                                    checked = playIncomingAudioInVitalik,
+                                    onCheckedChange = {
+                                        playIncomingAudioInVitalik = it
+                                        preferences.edit().putBoolean("play_incoming_audio_in_vitalik", it).apply()
+                                    }
+                                )
+                            }
                         }
                     }
                 }
