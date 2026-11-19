@@ -41,6 +41,7 @@ internal object RadioStreamController {
     @Volatile private var voiceStream: OutgoingVoiceStream? = null
     @Volatile private var running = false
     @Volatile private var selectedStation = ""
+    @Volatile private var lastStationUuid = ""
 
     fun isRadioCommand(text: String): Boolean = Regex("(?i)(радио|станци|включи музыку|поставь музыку|играй музыку|следующ.*станц|останови музыку|выключи музыку|стоп музыка)").containsMatchIn(text)
     fun isStopCommand(text: String): Boolean = Regex("(?i)(стоп радио|выключи радио|останови радио|останови музыку|выключи музыку|стоп музыка)").containsMatchIn(text)
@@ -63,15 +64,17 @@ internal object RadioStreamController {
         val endpoint = "https://de1.api.radio-browser.info/json/stations/search?" + params + "&hidebroken=true&order=clickcount&reverse=true&limit=30"
         val stations = JSONArray(String(get(endpoint), Charsets.UTF_8))
         if (stations.length() == 0) return "Не нашёл подходящую радиостанцию. Назови жанр или станцию."
-        var chosen = stations.optJSONObject(0)
+        var chosen: org.json.JSONObject? = null
         for (i in 0 until stations.length()) {
             val candidate = stations.optJSONObject(i) ?: continue
             val stream = candidate.optString("url_resolved").ifBlank { candidate.optString("url") }
-            if (stream.startsWith("https://")) { chosen = candidate; break }
+            val stationId = candidate.optString("stationuuid")
+            if (stream.startsWith("https://") && stationId != lastStationUuid) { chosen = candidate; break }
         }
         val streamUrl = chosen?.optString("url_resolved").orEmpty().ifBlank { chosen?.optString("url").orEmpty() }
         if (streamUrl.isBlank()) return "У этой станции нет доступного потока. Попробуй другую."
         val stationName = chosen?.optString("name").orEmpty().ifBlank { "Интернет-радио" }
+        lastStationUuid = chosen?.optString("stationuuid").orEmpty()
         stop()
         selectedStation = stationName
         main.postDelayed({ startTransmission(context, session, streamUrl) }, 4500L)
