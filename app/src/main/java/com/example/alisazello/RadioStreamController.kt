@@ -42,7 +42,7 @@ internal object RadioStreamController {
     @Volatile private var running = false
     @Volatile private var selectedStation = ""
 
-    fun isRadioCommand(text: String): Boolean = Regex("(?i)(радио|станци|включи музыку|поставь музыку|играй музыку|следующ.*станц)").containsMatchIn(text)
+    fun isRadioCommand(text: String): Boolean = Regex("(?i)(радио|станци|включи музыку|поставь музыку|играй музыку|следующ.*станц|останови музыку|выключи музыку|стоп музыка)").containsMatchIn(text)
     fun isStopCommand(text: String): Boolean = Regex("(?i)(стоп радио|выключи радио|останови радио|останови музыку|выключи музыку|стоп музыка)").containsMatchIn(text)
 
     fun handle(context: Context, session: Session, command: String): String {
@@ -56,7 +56,7 @@ internal object RadioStreamController {
         for (i in 0 until stations.length()) {
             val candidate = stations.optJSONObject(i) ?: continue
             val stream = candidate.optString("url_resolved").ifBlank { candidate.optString("url") }
-            if (stream.startsWith("http://") || stream.startsWith("https://")) { chosen = candidate; break }
+            if (stream.startsWith("https://")) { chosen = candidate; break }
         }
         val streamUrl = chosen?.optString("url_resolved").orEmpty().ifBlank { chosen?.optString("url").orEmpty() }
         if (streamUrl.isBlank()) return "У этой станции нет доступного потока. Попробуй другую."
@@ -140,7 +140,8 @@ internal object RadioStreamController {
         var offset = 0
         while (offset < output.size) {
             val end = minOf(offset + 320, output.size)
-            val chunk = output.copyOfRange(offset, end)
+            val chunk = ShortArray(320)
+            output.copyInto(chunk, 0, offset, end)
             if (!frames.offer(chunk)) { frames.poll(); frames.offer(chunk) }
             offset = end
         }
@@ -158,7 +159,7 @@ internal object RadioStreamController {
             val copy = ByteArray(count)
             inputBuffer.get(copy)
             onPcm(copy, format.sampleRate, format.channelCount)
-            replaceOutputBuffer(count).put(copy)
+            replaceOutputBuffer(count).put(copy).flip()
         }
         override fun onFlush() { }
         override fun onReset() { format = AudioProcessor.AudioFormat.NOT_SET }
